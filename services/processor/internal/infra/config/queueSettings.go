@@ -1,28 +1,57 @@
 package config
 
 import (
-	"context"
-
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	"os"
+	"strconv"
+	"strings"
 )
 
-func DefaultAWSConfigResolvers(ctx context.Context, endpoint string) *sqs.Client {
-	cfg, err := config.LoadDefaultConfig(ctx,
-		config.WithRegion("us-east-1"),
-		config.WithCredentialsProvider(
-			credentials.NewStaticCredentialsProvider("test", "test", ""),
-		),
-	)
+const (
+	defaultEndpoint    = "http://localhost:4566"
+	defaultProcessorID = "processor-local-1"
+	defaultRegion      = "us-east-1"
+	defaultWorkerCount = 4
+)
 
-	if err != nil {
-		panic(err)
+type Settings struct {
+	Endpoint          string
+	ProcessedQueueURL string
+	ProcessorID       string
+	RawQueueURL       string
+	Region            string
+	WorkerCount       int
+}
+
+func LoadSettings() Settings {
+	endpoint := envOrDefault("AWS_ENDPOINT_URL", defaultEndpoint)
+
+	return Settings{
+		Endpoint:          endpoint,
+		ProcessedQueueURL: envOrDefault("PROCESSED_QUEUE_URL", endpoint+"/000000000000/processed-events"),
+		ProcessorID:       envOrDefault("PROCESSOR_ID", defaultProcessorID),
+		RawQueueURL:       envOrDefault("RAW_QUEUE_URL", endpoint+"/000000000000/raw-events"),
+		Region:            envOrDefault("AWS_REGION", defaultRegion),
+		WorkerCount:       envIntOrDefault("WORKER_COUNT", defaultWorkerCount),
+	}
+}
+
+func envOrDefault(key, fallback string) string {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback
+	}
+	return value
+}
+
+func envIntOrDefault(key string, fallback int) int {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback
 	}
 
-	client := sqs.NewFromConfig(cfg, func(o *sqs.Options) {
-		o.BaseEndpoint = aws.String(endpoint)
-	})
-	return client
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed <= 0 {
+		return fallback
+	}
+	return parsed
 }
