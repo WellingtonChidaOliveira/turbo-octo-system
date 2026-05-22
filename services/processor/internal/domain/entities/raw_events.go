@@ -1,4 +1,4 @@
-package domain
+package entities
 
 type RawEvent struct {
 	EventID     string `json:"event_id"`

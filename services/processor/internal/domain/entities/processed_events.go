@@ -1,4 +1,4 @@
-package domain
+package entities
 
 type ProcessedEvent struct {
 	EventId     string `json:"event_id"`
