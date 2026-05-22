@@ -2,7 +2,7 @@ package queue
 
 import (
 	"context"
-	"processor/internal/domain/abstractions"
+	"processor/internal/domain/entities"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
@@ -20,7 +20,7 @@ func NewProcessedEventsPublisher(client *sqs.Client, queueUrl string) *Processed
 	}
 }
 
-func (p *ProcessedEventsPublisher) Send(ctx context.Context, message abstractions.QueueMessage) error {
+func (p *ProcessedEventsPublisher) Send(ctx context.Context, message entities.QueueMessage) error {
 	_, err := p.client.SendMessage(ctx, &sqs.SendMessageInput{
 		QueueUrl:    aws.String(p.queueUrl),
 		MessageBody: aws.String(message.Body),

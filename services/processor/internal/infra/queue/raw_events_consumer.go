@@ -2,7 +2,7 @@ package queue
 
 import (
 	"context"
-	"processor/internal/domain/abstractions"
+	"processor/internal/domain/entities"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
@@ -20,7 +20,7 @@ func NewRawEventsConsumer(client *sqs.Client, queueUrl string) *RawEventsConsume
 	}
 }
 
-func (c *RawEventsConsumer) Receive(ctx context.Context) ([]abstractions.QueueMessage, error) {
+func (c *RawEventsConsumer) Receive(ctx context.Context) ([]entities.QueueMessage, error) {
 	out, err := c.client.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{
 		QueueUrl:            aws.String(c.queueUrl),
 		MaxNumberOfMessages: 10,
@@ -31,9 +31,9 @@ func (c *RawEventsConsumer) Receive(ctx context.Context) ([]abstractions.QueueMe
 		return nil, err
 	}
 
-	var queueMessages []abstractions.QueueMessage
+	var queueMessages []entities.QueueMessage
 	for _, msg := range out.Messages {
-		queueMessages = append(queueMessages, abstractions.QueueMessage{
+		queueMessages = append(queueMessages, entities.QueueMessage{
 			Body:          aws.ToString(msg.Body),
 			ReceiptHandle: aws.ToString(msg.ReceiptHandle),
 		})

@@ -5,9 +5,10 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"processor/internal/domain/usecase"
+	"processor/internal/domain/entities"
 	"processor/internal/infra/config"
 	"processor/internal/infra/queue"
+	"processor/internal/usecase"
 	"syscall"
 )
 
@@ -25,7 +26,7 @@ func main() {
 	var (
 		publisher = queue.NewProcessedEventsPublisher(queueClient, settings.ProcessedQueueURL)
 		consumer  = queue.NewRawEventsConsumer(queueClient, settings.RawQueueURL)
-		processor = usecase.NewEventProcessor(consumer, publisher, settings.ProcessorID)
+		processor = usecase.NewEventProcessor(consumer, publisher, entities.SystemClock{}, settings.ProcessorID)
 	)
 
 	if err := processor.Handle(ctx); err != nil {

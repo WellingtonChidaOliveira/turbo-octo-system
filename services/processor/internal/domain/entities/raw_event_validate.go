@@ -2,76 +2,91 @@ package entities
 
 import (
 	"errors"
-	"fmt"
-	"regexp"
 	"strings"
 	"time"
 )
 
-var uuidRegex = regexp.MustCompile(
-	`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`,
-)
-
-var validMetricTypes = map[string]bool{
-	"commits":             true,
-	"pull_requests":       true,
-	"review_time_minutes": true,
+var validMetricTypes = map[string]struct{}{
+	"commits":             {},
+	"pull_requests":       {},
+	"review_time_minutes": {},
 }
 
-const maxReviewTimeMinutes = 1440
-
-type ValidationErrors []string
-
-func (ve ValidationErrors) Error() string {
-	return strings.Join(ve, "; ")
-}
-
-func (e RawEvent) Validate() error {
-	var errs ValidationErrors
-
-	if e.EventID == "" {
-		errs = append(errs, "event_id: obrigatório")
-	} else if !uuidRegex.MatchString(strings.ToLower(e.EventID)) {
-		errs = append(errs, "event_id: formato UUID inválido")
+func (e RawEvent) Validate(now time.Time) error {
+	if err := e.validateIdentity(); err != nil {
+		return err
 	}
+	if err := e.validateMetric(); err != nil {
+		return err
+	}
+	return e.validateTimestamp(now)
+}
 
+func (e RawEvent) validateIdentity() error {
+	if !isUUID(e.EventID) {
+		return errors.New("event_id is required and must be a valid UUID")
+	}
 	if strings.TrimSpace(e.DeveloperID) == "" {
-		errs = append(errs, "developer_id: obrigatório")
+		return errors.New("developer_id is required")
 	}
+	return nil
+}
 
-	if !validMetricTypes[e.MetricType] {
-		errs = append(errs, fmt.Sprintf(
-			"metric_type: valor inválido %q (esperado: commits, pull_requests, review_time_minutes)",
-			e.MetricType,
-		))
+func (e RawEvent) validateMetric() error {
+	if !isValidMetricType(e.MetricType) {
+		return errors.New("metric_type is invalid")
 	}
-
 	if e.Value < 0 {
-		errs = append(errs, "value: deve ser >= 0")
-	} else if e.MetricType == "review_time_minutes" && e.Value > maxReviewTimeMinutes {
-		errs = append(errs, fmt.Sprintf(
-			"value: para review_time_minutes o máximo é %d (24h)", maxReviewTimeMinutes,
-		))
+		return errors.New("value must be greater than or equal to zero")
+	}
+	if e.MetricType == "review_time_minutes" && e.Value > 1440 {
+		return errors.New("review_time_minutes cannot be greater than 1440")
+	}
+	return nil
+}
+
+func (e RawEvent) validateTimestamp(now time.Time) error {
+	eventTime, err := time.Parse(time.RFC3339, e.Timestamp)
+	if err != nil {
+		return errors.New("timestamp is required")
+	}
+	if eventTime.After(now.UTC()) {
+		return errors.New("timestamp cannot be in the future")
+	}
+	return nil
+}
+
+func isValidMetricType(metricType string) bool {
+	_, ok := validMetricTypes[metricType]
+	return ok
+}
+
+func isUUID(value string) bool {
+	if len(value) != 36 {
+		return false
 	}
 
-	if e.Timestamp == "" {
-		errs = append(errs, "timestamp: obrigatório")
-	} else {
-		t, err := time.Parse(time.RFC3339, e.Timestamp)
-		if err != nil {
-			errs = append(errs, "timestamp: formato inválido (esperado RFC3339, ex: 2006-01-02T15:04:05Z)")
-		} else if t.After(time.Now()) {
-			errs = append(errs, "timestamp: não pode ser uma data futura")
+	for index, char := range value {
+		if isUUIDSeparator(index, char) {
+			continue
+		}
+		if index == 8 || index == 13 || index == 18 || index == 23 {
+			return false
+		}
+		if !isHex(char) {
+			return false
 		}
 	}
 
-	if len(errs) == 0 {
-		return nil
-	}
-	return errs
+	return true
 }
 
-func IsValidationError(err error) bool {
-	var ve ValidationErrors
-	return errors.As(err, &ve)
+func isUUIDSeparator(index int, char rune) bool {
+	return (index == 8 || index == 13 || index == 18 || index == 23) && char == '-'
+}
+
+func isHex(char rune) bool {
+	return (char >= '0' && char <= '9') ||
+		(char >= 'a' && char <= 'f') ||
+		(char >= 'A' && char <= 'F')
 }
