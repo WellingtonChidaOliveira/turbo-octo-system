@@ -6,7 +6,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
-	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 )
 
 type RawEventsConsumer struct {
@@ -35,8 +34,8 @@ func (c *RawEventsConsumer) Receive(ctx context.Context) ([]abstractions.QueueMe
 	var queueMessages []abstractions.QueueMessage
 	for _, msg := range out.Messages {
 		queueMessages = append(queueMessages, abstractions.QueueMessage{
-			Body:          *msg.Body,
-			ReceiptHandle: *msg.ReceiptHandle,
+			Body:          aws.ToString(msg.Body),
+			ReceiptHandle: aws.ToString(msg.ReceiptHandle),
 		})
 	}
 
@@ -47,13 +46,6 @@ func (c *RawEventsConsumer) Delete(ctx context.Context, receiptHandle string) er
 	_, err := c.client.DeleteMessage(ctx, &sqs.DeleteMessageInput{
 		QueueUrl:      aws.String(c.queueUrl),
 		ReceiptHandle: aws.String(receiptHandle),
-	})
-	return err
-}
-func (c *RawEventsConsumer) delete(ctx context.Context, message types.Message) error {
-	_, err := c.client.DeleteMessage(ctx, &sqs.DeleteMessageInput{
-		QueueUrl:      aws.String(c.queueUrl),
-		ReceiptHandle: message.ReceiptHandle,
 	})
 	return err
 }

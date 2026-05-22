@@ -9,11 +9,11 @@ type QueueMessage struct {
 	ReceiptHandle string
 }
 
-type QueueConsumerInterface interface {
+type QueueConsumer interface {
 	Receive(ctx context.Context) ([]QueueMessage, error)
 	Delete(ctx context.Context, receiptHandle string) error
 }
 
-type QueuePublisherInterface interface {
+type QueuePublisher interface {
 	Send(ctx context.Context, message QueueMessage) error
 }
