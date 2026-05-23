@@ -8,48 +8,28 @@ import (
 	"processor/internal/usecase/ports"
 )
 
-// TODO: Receive messages from the queue, process them, and delete them from the queue after processing.
 type EventProcessor struct {
-	consumer    ports.QueueConsumer
 	publisher   ports.QueuePublisher
+	deleter     ports.QueueDeleter
 	clock       ports.Clock
 	processorID string
 }
 
 func NewEventProcessor(
-	consumer ports.QueueConsumer,
 	publisher ports.QueuePublisher,
+	deleter ports.QueueDeleter,
 	clock ports.Clock,
 	processorID string) *EventProcessor {
 	return &EventProcessor{
 		publisher:   publisher,
-		consumer:    consumer,
+		deleter:     deleter,
 		processorID: processorID,
 		clock:       clock,
 	}
 }
 
-func (p *EventProcessor) Handle(ctx context.Context) error {
-	for {
-		select {
-		case <-ctx.Done():
-			log.Println("Shutting down event processor...")
-			return nil
-		default:
-			messages, err := p.consumer.Receive(ctx)
-			if err != nil {
-				log.Printf("Error receiving messages: %v", err)
-				continue
-			}
-			for _, msg := range messages {
-				if err := p.ProcessMessage(ctx, msg); err != nil {
-					log.Printf("Error processing message: %v", err)
-					continue
-				}
-			}
-		}
-
-	}
+func (p *EventProcessor) Handle(ctx context.Context, message entities.QueueMessage) error {
+	return p.ProcessMessage(ctx, message)
 }
 
 func (p *EventProcessor) ProcessMessage(ctx context.Context, msg entities.QueueMessage) error {
@@ -66,7 +46,7 @@ func (p *EventProcessor) ProcessMessage(ctx context.Context, msg entities.QueueM
 		return err
 	}
 
-	err = p.consumer.Delete(ctx, msg.ReceiptHandle)
+	err = p.deleter.Delete(ctx, msg.ReceiptHandle)
 	if err != nil {
 		log.Printf("Error deleting message: %v", err)
 		return err

@@ -10,11 +10,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 )
 
-type SQSQueueClient struct {
-	client   *sqs.Client
-	queueUrl string
-}
-
 func NewQueueClient(ctx context.Context, setting conf.Settings) (*sqs.Client, error) {
 	cfg, err := config.LoadDefaultConfig(ctx,
 		config.WithRegion(setting.Region),

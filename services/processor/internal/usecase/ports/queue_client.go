@@ -7,6 +7,10 @@ import (
 
 type QueueConsumer interface {
 	Receive(ctx context.Context) ([]entities.QueueMessage, error)
+	QueueDeleter
+}
+
+type QueueDeleter interface {
 	Delete(ctx context.Context, receiptHandle string) error
 }
 

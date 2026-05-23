@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"processor/internal/domain/entities"
+	"sync"
 	"testing"
 	"time"
 )
 
 type fakeConsumer struct {
+	mu        sync.Mutex
 	deleted   []string
 	deleteErr error
 }
@@ -19,18 +21,35 @@ func (f *fakeConsumer) Receive(ctx context.Context) ([]entities.QueueMessage, er
 }
 
 func (f *fakeConsumer) Delete(ctx context.Context, msg string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.deleted = append(f.deleted, msg)
 	return f.deleteErr
 }
 
+func (f *fakeConsumer) deletedCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return len(f.deleted)
+}
+
 type fakePublisher struct {
+	mu      sync.Mutex
 	sent    []string
 	sendErr error
 }
 
 func (f *fakePublisher) Send(ctx context.Context, msg entities.QueueMessage) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.sent = append(f.sent, msg.Body)
 	return f.sendErr
+}
+
+func (f *fakePublisher) sentCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return len(f.sent)
 }
 
 type fakeClock struct {
@@ -43,20 +62,24 @@ func (f *fakeClock) Now() time.Time {
 
 func newTestProcessor(consumer *fakeConsumer, publisher *fakePublisher) *EventProcessor {
 	clock := &fakeClock{now: time.Date(2026, 4, 15, 10, 30, 5, 0, time.UTC)}
-	return NewEventProcessor(consumer, publisher, clock, "processor-1")
+	return NewEventProcessor(publisher, consumer, clock, "processor-1")
 }
 
 func validQueueMessage() entities.QueueMessage {
+	return validQueueMessageWithReceipt("receipt-1")
+}
+
+func validQueueMessageWithReceipt(receiptHandle string) entities.QueueMessage {
 	return entities.QueueMessage{
 		Body: `{
-              "event_id": "550e8400-e29b-41d4-a716-446655440000",
+	              "event_id": "550e8400-e29b-41d4-a716-446655440000",
               "developer_id": "dev-123",
               "metric_type": "commits",
               "value": 10,
               "repository": "org/repo",
-              "timestamp": "2026-04-15T10:30:00Z"
-          }`,
-		ReceiptHandle: "receipt-1",
+	              "timestamp": "2026-04-15T10:30:00Z"
+	          }`,
+		ReceiptHandle: receiptHandle,
 	}
 }
 
