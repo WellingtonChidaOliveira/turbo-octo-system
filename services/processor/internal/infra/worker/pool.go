@@ -2,7 +2,7 @@ package worker
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"processor/internal/domain/entities"
 	"sync"
 )
@@ -17,6 +17,10 @@ type Pool struct {
 }
 
 func NewPool(handler Handler, size int) *Pool {
+	if size <= 0 {
+		size = 1
+	}
+
 	return &Pool{
 		handler: handler,
 		size:    size,
@@ -37,25 +41,23 @@ func (p *Pool) Start(ctx context.Context, jobs <-chan entities.QueueMessage) {
 func (p *Pool) runWorker(ctx context.Context, workerId int, jobs <-chan entities.QueueMessage, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case job, ok := <-jobs:
-			if !ok {
-				return
-			}
-
-			p.handleJob(ctx, workerId, job)
-		}
+	for job := range jobs {
+		p.handleJob(ctx, workerId, job)
 	}
 }
 
 func (p *Pool) handleJob(ctx context.Context, workerId int, job entities.QueueMessage) {
 	if err := p.handler.Handle(ctx, job); err != nil {
-		log.Printf("worker=%d message_id=%s err=%v", workerId, job.ID, err)
+		slog.Error("worker failed to process message",
+			"worker_id", workerId,
+			"message_id", job.ID,
+			"error", err,
+		)
 		return
 	}
 
-	log.Printf("worker=%d message_id=%s processed successfully", workerId, job.ID)
+	slog.Info("worker processed message",
+		"worker_id", workerId,
+		"message_id", job.ID,
+	)
 }

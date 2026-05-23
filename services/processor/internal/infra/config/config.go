@@ -25,7 +25,7 @@ func LoadSettings() Settings {
 	settings.Region = getDefaultString("REGION", "us-east-1")
 	settings.KeysAwsAccessKeyId = getDefaultString("AWS_ACCESS_KEY_ID", "test")
 	settings.KeysAwsSecretAccessKey = getDefaultString("AWS_SECRET_ACCESS_KEY", "test")
-	settings.WorkerCount = getDefaultInt("WORKER_COUNT", 5)
+	settings.WorkerCount = normalizeWorkerCount(getDefaultInt("WORKER_COUNT", 5))
 
 	return settings
 }
@@ -48,4 +48,11 @@ func getDefaultInt(key string, defaultValue int) int {
 		return defaultValue
 	}
 	return value
+}
+
+func normalizeWorkerCount(workerCount int) int {
+	if workerCount <= 0 {
+		return 1
+	}
+	return workerCount
 }

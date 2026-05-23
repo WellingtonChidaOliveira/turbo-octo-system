@@ -66,6 +66,7 @@ func TestPool_StartStopsWhenContextIsCanceled(t *testing.T) {
 	}()
 
 	cancel()
+	close(jobs)
 
 	select {
 	case <-done:

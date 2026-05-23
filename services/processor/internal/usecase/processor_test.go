@@ -184,8 +184,8 @@ func TestProcessMessage_PublishError_DoesNotDelete(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	if len(publisher.sent) != 1 {
-		t.Fatalf("expected 1 publish attempt, got %d", len(publisher.sent))
+	if len(publisher.sent) != publishMaxAttempts {
+		t.Fatalf("expected %d publish attempts, got %d", publishMaxAttempts, len(publisher.sent))
 	}
 	if len(consumer.deleted) != 0 {
 		t.Fatalf("expected 0 deleted messages, got %d", len(consumer.deleted))

@@ -34,6 +34,7 @@ func (c *RawEventsConsumer) Receive(ctx context.Context) ([]entities.QueueMessag
 	var queueMessages []entities.QueueMessage
 	for _, msg := range out.Messages {
 		queueMessages = append(queueMessages, entities.QueueMessage{
+			ID:            aws.ToString(msg.MessageId),
 			Body:          aws.ToString(msg.Body),
 			ReceiptHandle: aws.ToString(msg.ReceiptHandle),
 		})
