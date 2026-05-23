@@ -20,5 +20,35 @@ services:
       retries: 10
       start_period: 15s
 
+  processor:
+    build:
+      context: ./services/processor
+      dockerfile: Dockerfile
+    container_name: turbo-octo-processor
+    depends_on:
+      localstack:
+        condition: service_healthy
+    environment:
+      PROCESSOR_ID: processor-1
+      QUEUE_URL: http://localstack:4566
+      RAW_QUEUE_URL: http://localstack:4566/000000000000/raw-events
+      PROCESSED_QUEUE_URL: http://localstack:4566/000000000000/processed-events
+      REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      WORKER_COUNT: 5
+      JOB_BUFFER_SIZE: 10
+      SHUTDOWN_TIMEOUT: 30s
+      SQS_MAX_NUMBER_OF_MESSAGES: 10
+      SQS_WAIT_TIME_SECONDS: 20
+      SQS_VISIBILITY_TIMEOUT_SECONDS: 30
+      RECEIVE_BACKOFF_INITIAL: 1s
+      RECEIVE_BACKOFF_MAX: 30s
+      RECEIVE_BACKOFF_JITTER: 250ms
+      PUBLISH_MAX_ATTEMPTS: 3
+      PUBLISH_BACKOFF_INITIAL: 100ms
+      PUBLISH_BACKOFF_MAX: 2s
+      PUBLISH_BACKOFF_JITTER: 50ms
+
 volumes:
   localstack-data:

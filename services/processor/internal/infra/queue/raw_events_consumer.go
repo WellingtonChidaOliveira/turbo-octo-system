@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"processor/internal/domain/entities"
+	"processor/internal/infra/config"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
@@ -11,21 +12,23 @@ import (
 type RawEventsConsumer struct {
 	client   *sqs.Client
 	queueUrl string
+	settings config.QueueSettings
 }
 
-func NewRawEventsConsumer(client *sqs.Client, queueUrl string) *RawEventsConsumer {
+func NewRawEventsConsumer(client *sqs.Client, queueUrl string, settings config.QueueSettings) *RawEventsConsumer {
 	return &RawEventsConsumer{
 		client:   client,
 		queueUrl: queueUrl,
+		settings: settings,
 	}
 }
 
 func (c *RawEventsConsumer) Receive(ctx context.Context) ([]entities.QueueMessage, error) {
 	out, err := c.client.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{
 		QueueUrl:            aws.String(c.queueUrl),
-		MaxNumberOfMessages: 10,
-		WaitTimeSeconds:     20,
-		VisibilityTimeout:   30,
+		MaxNumberOfMessages: c.settings.MaxNumberOfMessages,
+		WaitTimeSeconds:     c.settings.WaitTimeSeconds,
+		VisibilityTimeout:   c.settings.VisibilityTimeout,
 	})
 	if err != nil {
 		return nil, err

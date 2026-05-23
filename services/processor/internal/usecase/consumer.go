@@ -5,36 +5,34 @@ import (
 	"log/slog"
 	"processor/internal/domain/entities"
 	"processor/internal/usecase/ports"
-	"time"
-)
-
-const (
-	receiveInitialBackoff = time.Second
-	receiveMaxBackoff     = 30 * time.Second
+	"processor/internal/usecase/retry"
 )
 
 type RawEventConsumer struct {
 	consumer ports.QueueConsumer
+	retry    retry.Policy
 }
 
-func NewRawEventsConsumer(client ports.QueueConsumer) *RawEventConsumer {
+func NewRawEventsConsumer(client ports.QueueConsumer, retryPolicy retry.Policy) *RawEventConsumer {
 	return &RawEventConsumer{
 		consumer: client,
+		retry:    retryPolicy.Normalize(),
 	}
 }
 
 func (c *RawEventConsumer) Consumer(ctx context.Context, jobs chan<- entities.QueueMessage) {
 	defer close(jobs)
 
-	backoff := receiveInitialBackoff
+	attempt := 0
 	for ctx.Err() == nil {
 		messages, err := c.consumer.Receive(ctx)
 		if err != nil {
-			backoff = c.handleReceiveError(ctx, err, backoff)
+			attempt++
+			c.handleReceiveError(ctx, err, attempt)
 			continue
 		}
 
-		backoff = receiveInitialBackoff
+		attempt = 0
 		c.dispatchMessages(ctx, messages, jobs)
 	}
 
@@ -55,19 +53,18 @@ func (c *RawEventConsumer) dispatchMessages(ctx context.Context, messages []enti
 	}
 }
 
-func (c *RawEventConsumer) handleReceiveError(ctx context.Context, err error, backoff time.Duration) time.Duration {
+func (c *RawEventConsumer) handleReceiveError(ctx context.Context, err error, attempt int) {
 	if ctx.Err() != nil {
-		return backoff
+		return
 	}
 
+	backoff := c.retry.Delay(attempt)
 	slog.Warn("failed to receive raw events",
 		"stage", "receive",
+		"attempt", attempt,
 		"backoff_ms", backoff.Milliseconds(),
 		"error", err,
 	)
 
-	if waitErr := waitBackoff(ctx, backoff); waitErr != nil {
-		return backoff
-	}
-	return nextBackoff(backoff, receiveMaxBackoff)
+	_ = c.retry.Wait(ctx, attempt)
 }

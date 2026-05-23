@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"time"
 )
 
 type Settings struct {
@@ -14,6 +15,24 @@ type Settings struct {
 	KeysAwsAccessKeyId     string
 	KeysAwsSecretAccessKey string
 	WorkerCount            int
+	JobBufferSize          int
+	ShutdownTimeout        time.Duration
+	ReceiveBackoff         RetrySettings
+	PublishBackoff         RetrySettings
+	Queue                  QueueSettings
+}
+
+type RetrySettings struct {
+	InitialBackoff time.Duration
+	MaxBackoff     time.Duration
+	Jitter         time.Duration
+	MaxAttempts    int
+}
+
+type QueueSettings struct {
+	MaxNumberOfMessages int32
+	WaitTimeSeconds     int32
+	VisibilityTimeout   int32
 }
 
 func LoadSettings() Settings {
@@ -26,6 +45,25 @@ func LoadSettings() Settings {
 	settings.KeysAwsAccessKeyId = getDefaultString("AWS_ACCESS_KEY_ID", "test")
 	settings.KeysAwsSecretAccessKey = getDefaultString("AWS_SECRET_ACCESS_KEY", "test")
 	settings.WorkerCount = normalizeWorkerCount(getDefaultInt("WORKER_COUNT", 5))
+	settings.JobBufferSize = normalizePositiveInt(getDefaultInt("JOB_BUFFER_SIZE", settings.WorkerCount*2), settings.WorkerCount*2)
+	settings.ShutdownTimeout = getDuration("SHUTDOWN_TIMEOUT", 30*time.Second)
+	settings.ReceiveBackoff = RetrySettings{
+		InitialBackoff: getDuration("RECEIVE_BACKOFF_INITIAL", 1*time.Second),
+		MaxBackoff:     getDuration("RECEIVE_BACKOFF_MAX", 30*time.Second),
+		Jitter:         getDuration("RECEIVE_BACKOFF_JITTER", 250*time.Millisecond),
+		MaxAttempts:    normalizePositiveInt(getDefaultInt("RECEIVE_MAX_ATTEMPTS", 0), 0),
+	}
+	settings.PublishBackoff = RetrySettings{
+		InitialBackoff: getDuration("PUBLISH_BACKOFF_INITIAL", 100*time.Millisecond),
+		MaxBackoff:     getDuration("PUBLISH_BACKOFF_MAX", 2*time.Second),
+		Jitter:         getDuration("PUBLISH_BACKOFF_JITTER", 50*time.Millisecond),
+		MaxAttempts:    normalizePositiveInt(getDefaultInt("PUBLISH_MAX_ATTEMPTS", 3), 3),
+	}
+	settings.Queue = QueueSettings{
+		MaxNumberOfMessages: int32(normalizePositiveInt(getDefaultInt("SQS_MAX_NUMBER_OF_MESSAGES", 10), 10)),
+		WaitTimeSeconds:     int32(normalizeNonNegativeInt(getDefaultInt("SQS_WAIT_TIME_SECONDS", 20), 20)),
+		VisibilityTimeout:   int32(normalizePositiveInt(getDefaultInt("SQS_VISIBILITY_TIMEOUT_SECONDS", 30), 30)),
+	}
 
 	return settings
 }
@@ -55,4 +93,30 @@ func normalizeWorkerCount(workerCount int) int {
 		return 1
 	}
 	return workerCount
+}
+
+func normalizePositiveInt(value int, fallback int) int {
+	if value <= 0 {
+		return fallback
+	}
+	return value
+}
+
+func normalizeNonNegativeInt(value int, fallback int) int {
+	if value < 0 {
+		return fallback
+	}
+	return value
+}
+
+func getDuration(key string, defaultValue time.Duration) time.Duration {
+	valueStr := os.Getenv(key)
+	if valueStr == "" {
+		return defaultValue
+	}
+	value, err := time.ParseDuration(valueStr)
+	if err != nil {
+		return defaultValue
+	}
+	return value
 }

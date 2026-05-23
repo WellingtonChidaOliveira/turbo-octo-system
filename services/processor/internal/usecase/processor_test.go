@@ -5,10 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"processor/internal/domain/entities"
+	"processor/internal/usecase/retry"
 	"sync"
 	"testing"
 	"time"
 )
+
+const publishMaxAttempts = 3
 
 type fakeConsumer struct {
 	mu        sync.Mutex
@@ -62,7 +65,13 @@ func (f *fakeClock) Now() time.Time {
 
 func newTestProcessor(consumer *fakeConsumer, publisher *fakePublisher) *EventProcessor {
 	clock := &fakeClock{now: time.Date(2026, 4, 15, 10, 30, 5, 0, time.UTC)}
-	return NewEventProcessor(publisher, consumer, clock, "processor-1")
+	policy := retry.Policy{
+		InitialBackoff: 0,
+		MaxBackoff:     0,
+		Jitter:         0,
+		MaxAttempts:    publishMaxAttempts,
+	}
+	return NewEventProcessor(publisher, consumer, clock, "processor-1", policy)
 }
 
 func validQueueMessage() entities.QueueMessage {
@@ -138,6 +147,13 @@ func TestProcessMessage_InvalidMessage_ReturnsError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
+	var processingErr ProcessingError
+	if !errors.As(err, &processingErr) {
+		t.Fatalf("expected ProcessingError, got %T", err)
+	}
+	if processingErr.Type != ErrorTypeDecode {
+		t.Fatalf("expected decode error, got %s", processingErr.Type)
+	}
 
 	if len(publisher.sent) != 0 {
 		t.Fatalf("expected 0 published messages, got %d", len(publisher.sent))
@@ -167,6 +183,13 @@ func TestProcessMessage_InvalidEvent_DoesNotPublishOrDelete(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
+	var processingErr ProcessingError
+	if !errors.As(err, &processingErr) {
+		t.Fatalf("expected ProcessingError, got %T", err)
+	}
+	if processingErr.Type != ErrorTypeValidation {
+		t.Fatalf("expected validation error, got %s", processingErr.Type)
+	}
 	if len(publisher.sent) != 0 {
 		t.Fatalf("expected 0 published messages, got %d", len(publisher.sent))
 	}
@@ -184,6 +207,13 @@ func TestProcessMessage_PublishError_DoesNotDelete(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
+	var processingErr ProcessingError
+	if !errors.As(err, &processingErr) {
+		t.Fatalf("expected ProcessingError, got %T", err)
+	}
+	if processingErr.Type != ErrorTypePublish {
+		t.Fatalf("expected publish error, got %s", processingErr.Type)
+	}
 	if len(publisher.sent) != publishMaxAttempts {
 		t.Fatalf("expected %d publish attempts, got %d", publishMaxAttempts, len(publisher.sent))
 	}
@@ -200,6 +230,13 @@ func TestProcessMessage_DeleteError_ReturnsError(t *testing.T) {
 	err := processor.ProcessMessage(context.Background(), validQueueMessage())
 	if err == nil {
 		t.Fatal("expected error, got nil")
+	}
+	var processingErr ProcessingError
+	if !errors.As(err, &processingErr) {
+		t.Fatalf("expected ProcessingError, got %T", err)
+	}
+	if processingErr.Type != ErrorTypeDelete {
+		t.Fatalf("expected delete error, got %s", processingErr.Type)
 	}
 	if len(publisher.sent) != 1 {
 		t.Fatalf("expected 1 published message, got %d", len(publisher.sent))

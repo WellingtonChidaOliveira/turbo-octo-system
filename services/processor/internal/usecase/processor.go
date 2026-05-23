@@ -6,13 +6,7 @@ import (
 	"log/slog"
 	"processor/internal/domain/entities"
 	"processor/internal/usecase/ports"
-	"time"
-)
-
-const (
-	publishMaxAttempts    = 3
-	publishInitialBackoff = 100 * time.Millisecond
-	publishMaxBackoff     = 2 * time.Second
+	"processor/internal/usecase/retry"
 )
 
 type EventProcessor struct {
@@ -20,18 +14,21 @@ type EventProcessor struct {
 	deleter     ports.QueueDeleter
 	clock       ports.Clock
 	processorID string
+	retry       retry.Policy
 }
 
 func NewEventProcessor(
 	publisher ports.QueuePublisher,
 	deleter ports.QueueDeleter,
 	clock ports.Clock,
-	processorID string) *EventProcessor {
+	processorID string,
+	retryPolicy retry.Policy) *EventProcessor {
 	return &EventProcessor{
 		publisher:   publisher,
 		deleter:     deleter,
 		processorID: processorID,
 		clock:       clock,
+		retry:       retryPolicy.Normalize(),
 	}
 }
 
@@ -40,18 +37,22 @@ func (p *EventProcessor) Handle(ctx context.Context, message entities.QueueMessa
 }
 
 func (p *EventProcessor) ProcessMessage(ctx context.Context, msg entities.QueueMessage) error {
-	processedMsg, eventID, err := p.trateMessage(msg)
+	processedMsg, eventID, errorType, err := p.buildProcessedMessage(msg)
 	if err != nil {
+		processingErr := ProcessingError{Type: errorType, EventID: eventID, Err: err}
 		slog.Error("event processing failed",
 			"event_id", eventID,
+			"correlation_id", correlationID(eventID, msg.ID),
 			"message_id", msg.ID,
 			"stage", "process",
+			"error_type", processingErr.Type,
 			"error", err,
 		)
-		return err
+		return processingErr
 	}
 	slog.Info("event validated",
 		"event_id", eventID,
+		"correlation_id", correlationID(eventID, msg.ID),
 		"message_id", msg.ID,
 		"stage", "process",
 	)
@@ -64,14 +65,17 @@ func (p *EventProcessor) ProcessMessage(ctx context.Context, msg entities.QueueM
 	if err != nil {
 		slog.Error("event delete failed",
 			"event_id", eventID,
+			"correlation_id", correlationID(eventID, msg.ID),
 			"message_id", msg.ID,
 			"stage", "delete",
+			"error_type", ErrorTypeDelete,
 			"error", err,
 		)
-		return err
+		return ProcessingError{Type: ErrorTypeDelete, EventID: eventID, Err: err}
 	}
 	slog.Info("event deleted",
 		"event_id", eventID,
+		"correlation_id", correlationID(eventID, msg.ID),
 		"message_id", msg.ID,
 		"stage", "delete",
 	)
@@ -80,14 +84,13 @@ func (p *EventProcessor) ProcessMessage(ctx context.Context, msg entities.QueueM
 }
 
 func (p *EventProcessor) publishWithBackoff(ctx context.Context, eventID string, messageID string, msg entities.QueueMessage) error {
-	backoff := publishInitialBackoff
-
 	var err error
-	for attempt := 1; attempt <= publishMaxAttempts; attempt++ {
+	for attempt := 1; attempt <= p.retry.MaxAttempts; attempt++ {
 		err = p.publisher.Send(ctx, msg)
 		if err == nil {
 			slog.Info("event published",
 				"event_id", eventID,
+				"correlation_id", correlationID(eventID, messageID),
 				"message_id", messageID,
 				"stage", "publish",
 				"attempt", attempt,
@@ -95,70 +98,61 @@ func (p *EventProcessor) publishWithBackoff(ctx context.Context, eventID string,
 			return nil
 		}
 
+		backoff := p.retry.Delay(attempt)
 		slog.Warn("event publish attempt failed",
 			"event_id", eventID,
+			"correlation_id", correlationID(eventID, messageID),
 			"message_id", messageID,
 			"stage", "publish",
 			"attempt", attempt,
-			"max_attempts", publishMaxAttempts,
+			"max_attempts", p.retry.MaxAttempts,
 			"backoff_ms", backoff.Milliseconds(),
+			"error_type", ErrorTypePublish,
 			"error", err,
 		)
 
-		if attempt == publishMaxAttempts {
+		if attempt == p.retry.MaxAttempts {
 			break
 		}
-		if waitErr := waitBackoff(ctx, backoff); waitErr != nil {
-			return waitErr
+		if waitErr := p.retry.Wait(ctx, attempt); waitErr != nil {
+			return ProcessingError{Type: ErrorTypePublish, EventID: eventID, Err: waitErr}
 		}
-		backoff = nextBackoff(backoff, publishMaxBackoff)
 	}
 
 	slog.Error("event publish failed",
 		"event_id", eventID,
+		"correlation_id", correlationID(eventID, messageID),
 		"message_id", messageID,
 		"stage", "publish",
-		"attempts", publishMaxAttempts,
+		"attempts", p.retry.MaxAttempts,
+		"error_type", ErrorTypePublish,
 		"error", err,
 	)
-	return err
+	return ProcessingError{Type: ErrorTypePublish, EventID: eventID, Err: err}
 }
 
-func waitBackoff(ctx context.Context, delay time.Duration) error {
-	timer := time.NewTimer(delay)
-	defer timer.Stop()
-
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-timer.C:
-		return nil
-	}
-}
-
-func nextBackoff(current time.Duration, max time.Duration) time.Duration {
-	next := current * 2
-	if next > max {
-		return max
-	}
-	return next
-}
-
-func (p *EventProcessor) trateMessage(msg entities.QueueMessage) (string, string, error) {
+func (p *EventProcessor) buildProcessedMessage(msg entities.QueueMessage) (string, string, ErrorType, error) {
 	var event entities.RawEvent
 	if err := json.Unmarshal([]byte(msg.Body), &event); err != nil {
-		return "", "", err
+		return "", "", ErrorTypeDecode, err
 	}
 
 	if err := event.Validate(p.clock.Now()); err != nil {
-		return "", event.EventID, err
+		return "", event.EventID, ErrorTypeValidation, err
 	}
 
 	processEvent := event.ToProcessed(p.processorID, p.clock.Now())
 	processedMsg, err := json.Marshal(processEvent)
 	if err != nil {
-		return "", event.EventID, err
+		return "", event.EventID, ErrorTypeEncode, err
 	}
 
-	return string(processedMsg), event.EventID, nil
+	return string(processedMsg), event.EventID, "", nil
+}
+
+func correlationID(eventID string, messageID string) string {
+	if eventID != "" {
+		return eventID
+	}
+	return messageID
 }

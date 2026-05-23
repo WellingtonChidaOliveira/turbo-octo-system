@@ -10,7 +10,9 @@ import (
 	"processor/internal/infra/queue"
 	"processor/internal/infra/worker"
 	"processor/internal/usecase"
+	"processor/internal/usecase/retry"
 	"syscall"
+	"time"
 )
 
 func main() {
@@ -30,18 +32,25 @@ func main() {
 	}
 
 	var (
+		policy         = retry.NewPolicy(settings)
 		eventPublisher = queue.NewProcessedEventsPublisher(queueClient, settings.ProcessedQueueURL)
-		eventConsumer  = queue.NewRawEventsConsumer(queueClient, settings.RawQueueURL)
-		consumer       = usecase.NewRawEventsConsumer(eventConsumer) // TODO: Remove this line after implementing the consumer interface
-		processor      = usecase.NewEventProcessor(eventPublisher, eventConsumer, entities.SystemClock{}, settings.ProcessorID)
-		pool           = worker.NewPool(processor, settings.WorkerCount)
-		jobs           = make(chan entities.QueueMessage, settings.WorkerCount*2)
-		workersDone    = make(chan struct{})
+		eventConsumer  = queue.NewRawEventsConsumer(queueClient, settings.RawQueueURL, settings.Queue)
+		consumer       = usecase.NewRawEventsConsumer(eventConsumer, policy)
+		processor      = usecase.NewEventProcessor(
+			eventPublisher,
+			eventConsumer,
+			entities.SystemClock{},
+			settings.ProcessorID,
+			policy)
+		pool        = worker.NewPool(processor, settings.WorkerCount)
+		jobs        = make(chan entities.QueueMessage, settings.JobBufferSize)
+		workersDone = make(chan struct{})
 	)
 
 	slog.Info("processor starting",
 		"processor_id", settings.ProcessorID,
 		"worker_count", settings.WorkerCount,
+		"job_buffer_size", settings.JobBufferSize,
 	)
 	go func() {
 		pool.Start(ctx, jobs)
@@ -49,7 +58,14 @@ func main() {
 	}()
 
 	consumer.Consumer(ctx, jobs)
-	<-workersDone
+	select {
+	case <-workersDone:
+	case <-time.After(settings.ShutdownTimeout):
+		slog.Warn("processor shutdown timeout exceeded",
+			"processor_id", settings.ProcessorID,
+			"shutdown_timeout", settings.ShutdownTimeout.String(),
+		)
+	}
 
 	slog.Info("processor stopped", "processor_id", settings.ProcessorID)
 
