@@ -41,7 +41,7 @@ func main() {
 		processedEventsQueue = queue.NewProcessedEventConsumer(queueClient, cfg.Queue.ProcessedQueueURL, cfg.Queue)
 		eventStore           = repository.NewDynamoEventStore(dynamoClient, cfg.Dynamo.EventsTableName, cfg.Dynamo.DeveloperSummaryTableName)
 
-		receivePolicy          = retryPolicy(cfg.ReceiveBackoff)
+		receivePolicy          = retry.NewPolicy(cfg.ReceiveBackoff)
 		processedEventConsumer = usecase.NewProcessedEventConsumer(processedEventsQueue, receivePolicy)
 		persistData            = usecase.NewPersistProcessedEventHandler(eventStore, processedEventsQueue)
 		eventsGetter           = usecase.NewGetProcessedEventsByDeveloper(eventStore)
@@ -58,13 +58,4 @@ func main() {
 	)
 
 	service.Run(ctx, stop)
-}
-
-func retryPolicy(settings config.RetrySettings) retry.Policy {
-	return retry.Policy{
-		InitialBackoff: settings.InitialBackoff,
-		MaxBackoff:     settings.MaxBackoff,
-		Jitter:         settings.Jitter,
-		MaxAttempts:    settings.MaxAttempts,
-	}
 }

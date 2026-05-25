@@ -1,6 +1,7 @@
 package retry
 
 import (
+	"aggregator/internal/infra/config"
 	"context"
 	"math/rand"
 	"time"
@@ -11,6 +12,15 @@ type Policy struct {
 	MaxBackoff     time.Duration
 	Jitter         time.Duration
 	MaxAttempts    int
+}
+
+func NewPolicy(settings config.RetrySettings) Policy {
+	return Policy{
+		InitialBackoff: settings.InitialBackoff,
+		MaxBackoff:     settings.MaxBackoff,
+		Jitter:         settings.Jitter,
+		MaxAttempts:    settings.MaxAttempts,
+	}
 }
 
 func (p Policy) Normalize() Policy {

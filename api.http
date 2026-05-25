@@ -1,0 +1,8 @@
+GET http://localhost:8080/metrics/dev-003
+
+###
+
+GET http://localhost:8080/metrics/dev-003/summary
+
+###
+GET http://localhost:8080/health
