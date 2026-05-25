@@ -13,20 +13,20 @@ raw-events -> processor -> processed-events -> aggregator -> DynamoDB -> API RES
 Suba toda a aplicacao:
 
 ```bash
-docker compose up --build
+make up-build
 ```
 
 Se o LocalStack estiver com estado antigo e o init de recursos falhar, limpe o volume:
 
 ```bash
-docker compose down -v
-docker compose up --build
+make reset
+make up-build
 ```
 
 Popule a fila `raw-events`:
 
 ```bash
-./scripts/seed.sh
+make seed
 ```
 
 Consulte a API do aggregator:
@@ -35,6 +35,34 @@ Consulte a API do aggregator:
 curl http://localhost:8080/health
 curl http://localhost:8080/metrics/dev-001
 curl http://localhost:8080/metrics/dev-001/summary
+```
+
+## Makefile
+
+Comandos principais:
+
+```bash
+make help
+make up
+make up-build
+make down
+make reset
+make logs
+make test
+make test-nocache
+make seed
+make purge
+make health
+```
+
+Smokes separados:
+
+```bash
+make smoke-receive        # evento valido entra no pipeline e aparece na API
+make smoke-duplicate      # evento duplicado nao incrementa o resumo duas vezes
+make smoke-invalid        # evento invalido vai para raw-events-dlq
+make smoke-last-activity  # evento fora de ordem nao reduz last_activity
+make smoke                # roda todos os smokes acima
 ```
 
 ## Servicos
@@ -143,11 +171,8 @@ Aliases legados ainda aceitos temporariamente: `QUEUE_URL` para `AWS_ENDPOINT_UR
 ## Testes
 
 ```bash
-cd services/processor
-GOCACHE=/tmp/go-build go test ./...
-
-cd ../aggregator
-GOCACHE=/tmp/go-build go test ./...
+make test
+make test-nocache
 ```
 
 ## Tradeoffs
