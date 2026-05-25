@@ -14,6 +14,6 @@ func NewGetDeveloperSummary(store ports.DeveloperSummaryStore) *GetDeveloperSumm
 	return &GetDeveloperSummary{store: store}
 }
 
-func (uc *GetDeveloperSummary) Execute(ctx context.Context, developerID string) (entities.DeveloperSummary, error) {
+func (uc *GetDeveloperSummary) Handle(ctx context.Context, developerID string) (entities.DeveloperSummary, error) {
 	return uc.store.FindSummaryByDeveloperID(ctx, developerID)
 }

@@ -41,6 +41,6 @@ func main() {
 		jobs          = make(chan dto.QueueMessage, cfg.JobBufferSize)
 	)
 
-	go consumer.Consume(ctx, jobs)
+	go consumer.Handle(ctx, jobs)
 	workerPool.Start(ctx, jobs)
 }

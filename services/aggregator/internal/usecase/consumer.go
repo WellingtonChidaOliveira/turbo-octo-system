@@ -17,7 +17,7 @@ func NewProcessedEventConsumer(consumer ports.QueueConsumer) *ProcessedEventCons
 	}
 }
 
-func (c *ProcessedEventConsumer) Consume(ctx context.Context, jobs chan<- dto.QueueMessage) {
+func (c *ProcessedEventConsumer) Handle(ctx context.Context, jobs chan<- dto.QueueMessage) {
 	defer close(jobs)
 
 	for ctx.Err() == nil {

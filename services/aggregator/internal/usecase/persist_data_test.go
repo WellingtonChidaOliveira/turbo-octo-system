@@ -14,7 +14,7 @@ func TestPersistData_Execute_PersistsAndDeletes(t *testing.T) {
 	deleter := &fakeQueueDeleter{}
 	handler := NewPersistDataHandler(store, deleter)
 
-	err := handler.Execute(context.Background(), validQueueMessage())
+	err := handler.Handle(context.Background(), validQueueMessage())
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
@@ -31,7 +31,7 @@ func TestPersistData_Execute_DuplicateEventDeletesMessage(t *testing.T) {
 	deleter := &fakeQueueDeleter{}
 	handler := NewPersistDataHandler(store, deleter)
 
-	err := handler.Execute(context.Background(), validQueueMessage())
+	err := handler.Handle(context.Background(), validQueueMessage())
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
@@ -46,7 +46,7 @@ func TestPersistData_Execute_StoreErrorDoesNotDeleteMessage(t *testing.T) {
 	deleter := &fakeQueueDeleter{}
 	handler := NewPersistDataHandler(store, deleter)
 
-	err := handler.Execute(context.Background(), validQueueMessage())
+	err := handler.Handle(context.Background(), validQueueMessage())
 	if !errors.Is(err, storeErr) {
 		t.Fatalf("expected store error, got %v", err)
 	}
@@ -61,7 +61,7 @@ func TestPersistData_Execute_DeleteErrorReturnsError(t *testing.T) {
 	deleter := &fakeQueueDeleter{deleteErr: deleteErr}
 	handler := NewPersistDataHandler(store, deleter)
 
-	err := handler.Execute(context.Background(), validQueueMessage())
+	err := handler.Handle(context.Background(), validQueueMessage())
 	if !errors.Is(err, deleteErr) {
 		t.Fatalf("expected delete error, got %v", err)
 	}
@@ -72,7 +72,7 @@ func TestPersistData_Execute_InvalidJSONDoesNotDeleteMessage(t *testing.T) {
 	deleter := &fakeQueueDeleter{}
 	handler := NewPersistDataHandler(store, deleter)
 
-	err := handler.Execute(context.Background(), dto.QueueMessage{
+	err := handler.Handle(context.Background(), dto.QueueMessage{
 		ID:            "message-1",
 		Body:          "invalid",
 		ReceiptHandle: "receipt-1",

@@ -23,10 +23,6 @@ func NewPersistDataHandler(store ports.ProcessedEventStore, deleter ports.QueueD
 }
 
 func (h *PersistData) Handle(ctx context.Context, msg dto.QueueMessage) error {
-	return h.Execute(ctx, msg)
-}
-
-func (h *PersistData) Execute(ctx context.Context, msg dto.QueueMessage) error {
 	var eventDTO dto.ProcessedEvent
 	if err := json.Unmarshal([]byte(msg.Body), &eventDTO); err != nil {
 		slog.Error("failed to decode processed event",

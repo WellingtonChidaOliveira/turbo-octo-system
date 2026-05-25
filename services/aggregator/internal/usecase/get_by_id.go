@@ -14,6 +14,6 @@ func NewGetProcessedEventByID(store ports.ProcessedEventStore) *GetProcessedEven
 	return &GetProcessedEventByID{store: store}
 }
 
-func (uc *GetProcessedEventByID) Execute(ctx context.Context, eventID string) (entities.ProcessedEvent, error) {
+func (uc *GetProcessedEventByID) Handle(ctx context.Context, eventID string) (entities.ProcessedEvent, error) {
 	return uc.store.FindByID(ctx, eventID)
 }
