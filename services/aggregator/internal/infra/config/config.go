@@ -8,9 +8,10 @@ import (
 
 type Settings struct {
 	ProcessorID            string
-	QueueUrl               string
+	AwsEndpointURL         string
 	RawQueueURL            string
 	ProcessedQueueURL      string
+	EventsTableName        string
 	Region                 string
 	KeysAwsAccessKeyId     string
 	KeysAwsSecretAccessKey string
@@ -38,9 +39,10 @@ type QueueSettings struct {
 func LoadSettings() Settings {
 	var settings Settings
 	settings.ProcessorID = getDefaultString("PROCESSOR_ID", "processor-1")
-	settings.QueueUrl = getDefaultString("QUEUE_URL", "http://localhost:4566/")
+	settings.AwsEndpointURL = getDefaultString("AWS_ENDPOINT_URL", getDefaultString("QUEUE_URL", "http://localhost:4566/"))
 	settings.RawQueueURL = getDefaultString("RAW_QUEUE_URL", "http://localhost:4566/000000000000/raw-events")
 	settings.ProcessedQueueURL = getDefaultString("PROCESSED_QUEUE_URL", "http://localhost:4566/000000000000/processed-events")
+	settings.EventsTableName = getDefaultString("EVENTS_TABLE_NAME", "events")
 	settings.Region = getDefaultString("REGION", "us-east-1")
 	settings.KeysAwsAccessKeyId = getDefaultString("AWS_ACCESS_KEY_ID", "test")
 	settings.KeysAwsSecretAccessKey = getDefaultString("AWS_SECRET_ACCESS_KEY", "test")

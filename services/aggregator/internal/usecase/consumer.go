@@ -32,7 +32,7 @@ func (c *ProcessedEventConsumer) Consume(ctx context.Context, jobs chan<- dto.Qu
 			case <-ctx.Done():
 				return
 			case jobs <- msg:
-				slog.Info("message queued",
+				slog.Info("message consume",
 					"message_id", msg.ID,
 					"stage", "dispatch",
 				)

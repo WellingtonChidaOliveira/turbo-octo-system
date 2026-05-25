@@ -28,7 +28,7 @@ func NewQueueClient(ctx context.Context, cfg cfg.Settings) (*sqs.Client, error) 
 	}
 
 	client := sqs.NewFromConfig(c, func(o *sqs.Options) {
-		o.BaseEndpoint = aws.String(cfg.QueueUrl)
+		o.BaseEndpoint = aws.String(cfg.AwsEndpointURL)
 	})
 
 	return client, nil

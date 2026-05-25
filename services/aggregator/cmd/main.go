@@ -4,6 +4,7 @@ import (
 	"aggregator/internal/dto"
 	"aggregator/internal/infra/config"
 	"aggregator/internal/infra/queue"
+	"aggregator/internal/infra/repository"
 	"aggregator/internal/usecase"
 	"context"
 	"log/slog"
@@ -24,11 +25,19 @@ func main() {
 		os.Exit(1)
 	}
 
+	dynamoClient, err := repository.NewDynamoClient(ctx, cfg)
+	if err != nil {
+		slog.Error("failed to create dynamodb client", "error", err)
+		os.Exit(1)
+	}
+
 	var (
 		eventConsumer = queue.NewProcessedEventsConsumer(queueClient, cfg.ProcessedQueueURL, cfg.Queue)
 		consumer      = usecase.NewProcessedEventConsumer(eventConsumer)
+		eventStore    = repository.NewDynamoEventStore(dynamoClient, cfg.EventsTableName)
 		jobs          = make(chan dto.QueueMessage, cfg.JobBufferSize)
 	)
+	_ = eventStore
 
 	consumer.Consume(ctx, jobs)
 }
