@@ -15,8 +15,18 @@ aws --endpoint-url=http://localhost:4566 sqs create-queue --queue-name processed
 # Tabelas DynamoDB
 aws --endpoint-url=http://localhost:4566 dynamodb create-table \
   --table-name events \
-  --attribute-definitions AttributeName=event_id,AttributeType=S \
+  --attribute-definitions AttributeName=event_id,AttributeType=S AttributeName=developer_id,AttributeType=S AttributeName=timestamp,AttributeType=S \
   --key-schema AttributeName=event_id,KeyType=HASH \
+  --global-secondary-indexes '[
+    {
+      "IndexName": "developer_id-index",
+      "KeySchema": [
+        {"AttributeName": "developer_id", "KeyType": "HASH"},
+        {"AttributeName": "timestamp", "KeyType": "RANGE"}
+      ],
+      "Projection": {"ProjectionType": "ALL"}
+    }
+  ]' \
   --billing-mode PAY_PER_REQUEST
 
 aws --endpoint-url=http://localhost:4566 dynamodb create-table \

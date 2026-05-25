@@ -2,6 +2,8 @@ package repository
 
 import (
 	"aggregator/internal/domain/entities"
+	"aggregator/internal/infra/repository/records"
+	"aggregator/internal/usecase/apperrors"
 	"context"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -11,34 +13,32 @@ import (
 )
 
 type DynamoEventStore struct {
-	client    *dynamodb.Client
-	tableName string
+	client           *dynamodb.Client
+	eventsTableName  string
+	summaryTableName string
 }
 
-func NewDynamoEventStore(client *dynamodb.Client, tableName string) *DynamoEventStore {
+func NewDynamoEventStore(client *dynamodb.Client, eventsTableName string, summaryTableName string) *DynamoEventStore {
 	return &DynamoEventStore{
-		client:    client,
-		tableName: tableName,
+		client:           client,
+		eventsTableName:  eventsTableName,
+		summaryTableName: summaryTableName,
 	}
 }
 
-func (s *DynamoEventStore) Save(ctx context.Context, event entities.ProcessedEvent) error {
-	item, err := attributevalue.MarshalMap(processedEventRecordFromEntity(event))
+func (s *DynamoEventStore) SaveEventAndIncrementSummary(ctx context.Context, event entities.ProcessedEvent) error {
+	input, err := buildSaveEventAndSummaryInput(s.eventsTableName, s.summaryTableName, event)
 	if err != nil {
 		return err
 	}
 
-	_, err = s.client.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName:           aws.String(s.tableName),
-		Item:                item,
-		ConditionExpression: aws.String("attribute_not_exists(event_id)"),
-	})
-	return err
+	_, err = s.client.TransactWriteItems(ctx, input)
+	return mapDynamoWriteError(err)
 }
 
 func (s *DynamoEventStore) FindByID(ctx context.Context, eventID string) (entities.ProcessedEvent, error) {
 	out, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
-		TableName: aws.String(s.tableName),
+		TableName: aws.String(s.eventsTableName),
 		Key: map[string]types.AttributeValue{
 			"event_id": &types.AttributeValueMemberS{Value: eventID},
 		},
@@ -47,73 +47,63 @@ func (s *DynamoEventStore) FindByID(ctx context.Context, eventID string) (entiti
 		return entities.ProcessedEvent{}, err
 	}
 	if len(out.Item) == 0 {
-		return entities.ProcessedEvent{}, nil
+		return entities.ProcessedEvent{}, apperrors.ErrNotFound
 	}
 
-	var record processedEventRecord
+	var record records.ProcessedEvent
 	if err := attributevalue.UnmarshalMap(out.Item, &record); err != nil {
 		return entities.ProcessedEvent{}, err
 	}
-	return record.toEntity(), nil
+	return record.ToEntity(), nil
 }
 
 func (s *DynamoEventStore) FindByDeveloperID(ctx context.Context, developerID string) ([]entities.ProcessedEvent, error) {
-	out, err := s.client.Scan(ctx, &dynamodb.ScanInput{
-		TableName:        aws.String(s.tableName),
-		FilterExpression: aws.String("developer_id = :developer_id"),
+	paginator := dynamodb.NewQueryPaginator(s.client, &dynamodb.QueryInput{
+		TableName:              aws.String(s.eventsTableName),
+		IndexName:              aws.String("developer_id-index"),
+		KeyConditionExpression: aws.String("developer_id = :developer_id"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":developer_id": &types.AttributeValueMemberS{Value: developerID},
 		},
 	})
-	if err != nil {
-		return nil, err
+
+	events := make([]entities.ProcessedEvent, 0)
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		var eventRecords []records.ProcessedEvent
+		if err := attributevalue.UnmarshalListOfMaps(out.Items, &eventRecords); err != nil {
+			return nil, err
+		}
+
+		for _, record := range eventRecords {
+			events = append(events, record.ToEntity())
+		}
 	}
 
-	var records []processedEventRecord
-	if err := attributevalue.UnmarshalListOfMaps(out.Items, &records); err != nil {
-		return nil, err
-	}
-
-	events := make([]entities.ProcessedEvent, 0, len(records))
-	for _, record := range records {
-		events = append(events, record.toEntity())
-	}
 	return events, nil
 }
 
-type processedEventRecord struct {
-	EventID     string `dynamodbav:"event_id"`
-	DeveloperID string `dynamodbav:"developer_id"`
-	MetricType  string `dynamodbav:"metric_type"`
-	Value       int    `dynamodbav:"value"`
-	Repository  string `dynamodbav:"repository"`
-	Timestamp   string `dynamodbav:"timestamp"`
-	ProcessedAt string `dynamodbav:"processed_at"`
-	ProcessorID string `dynamodbav:"processor_id"`
-}
-
-func processedEventRecordFromEntity(event entities.ProcessedEvent) processedEventRecord {
-	return processedEventRecord{
-		EventID:     event.EventID,
-		DeveloperID: event.DeveloperID,
-		MetricType:  event.MetricType,
-		Value:       event.Value,
-		Repository:  event.Repository,
-		Timestamp:   event.Timestamp,
-		ProcessedAt: event.ProcessedAt,
-		ProcessorID: event.ProcessorID,
+func (s *DynamoEventStore) FindSummaryByDeveloperID(ctx context.Context, developerID string) (entities.DeveloperSummary, error) {
+	out, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName: aws.String(s.summaryTableName),
+		Key: map[string]types.AttributeValue{
+			"developer_id": &types.AttributeValueMemberS{Value: developerID},
+		},
+	})
+	if err != nil {
+		return entities.DeveloperSummary{}, err
 	}
-}
-
-func (r processedEventRecord) toEntity() entities.ProcessedEvent {
-	return entities.ProcessedEvent{
-		EventID:     r.EventID,
-		DeveloperID: r.DeveloperID,
-		MetricType:  r.MetricType,
-		Value:       r.Value,
-		Repository:  r.Repository,
-		Timestamp:   r.Timestamp,
-		ProcessedAt: r.ProcessedAt,
-		ProcessorID: r.ProcessorID,
+	if len(out.Item) == 0 {
+		return entities.DeveloperSummary{}, apperrors.ErrNotFound
 	}
+
+	var record records.DeveloperSummary
+	if err := attributevalue.UnmarshalMap(out.Item, &record); err != nil {
+		return entities.DeveloperSummary{}, err
+	}
+	return record.ToEntity(), nil
 }

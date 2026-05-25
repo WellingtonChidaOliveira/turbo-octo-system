@@ -50,5 +50,28 @@ services:
       PUBLISH_BACKOFF_MAX: 2s
       PUBLISH_BACKOFF_JITTER: 50ms
 
+  aggregator:
+    build:
+      context: ./services/aggregator
+      dockerfile: Dockerfile
+    container_name: turbo-octo-aggregator
+    depends_on:
+      localstack:
+        condition: service_healthy
+    environment:
+      AWS_ENDPOINT_URL: http://localstack:4566
+      PROCESSED_QUEUE_URL: http://localstack:4566/000000000000/processed-events
+      EVENTS_TABLE_NAME: events
+      DEVELOPER_SUMMARY_TABLE_NAME: developer_summary
+      REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      WORKER_COUNT: 5
+      JOB_BUFFER_SIZE: 10
+      SHUTDOWN_TIMEOUT: 30s
+      SQS_MAX_NUMBER_OF_MESSAGES: 10
+      SQS_WAIT_TIME_SECONDS: 20
+      SQS_VISIBILITY_TIMEOUT_SECONDS: 30
+
 volumes:
   localstack-data:

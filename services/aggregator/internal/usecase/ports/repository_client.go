@@ -6,7 +6,11 @@ import (
 )
 
 type ProcessedEventStore interface {
-	Save(ctx context.Context, event entities.ProcessedEvent) error
+	SaveEventAndIncrementSummary(ctx context.Context, event entities.ProcessedEvent) error
 	FindByID(ctx context.Context, eventID string) (entities.ProcessedEvent, error)
 	FindByDeveloperID(ctx context.Context, developerID string) ([]entities.ProcessedEvent, error)
+}
+
+type DeveloperSummaryStore interface {
+	FindSummaryByDeveloperID(ctx context.Context, developerID string) (entities.DeveloperSummary, error)
 }

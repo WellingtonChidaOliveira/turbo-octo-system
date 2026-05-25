@@ -7,20 +7,21 @@ import (
 )
 
 type Settings struct {
-	ProcessorID            string
-	AwsEndpointURL         string
-	RawQueueURL            string
-	ProcessedQueueURL      string
-	EventsTableName        string
-	Region                 string
-	KeysAwsAccessKeyId     string
-	KeysAwsSecretAccessKey string
-	WorkerCount            int
-	JobBufferSize          int
-	ShutdownTimeout        time.Duration
-	ReceiveBackoff         RetrySettings
-	PublishBackoff         RetrySettings
-	Queue                  QueueSettings
+	ProcessorID               string
+	AwsEndpointURL            string
+	RawQueueURL               string
+	ProcessedQueueURL         string
+	EventsTableName           string
+	DeveloperSummaryTableName string
+	Region                    string
+	KeysAwsAccessKeyId        string
+	KeysAwsSecretAccessKey    string
+	WorkerCount               int
+	JobBufferSize             int
+	ShutdownTimeout           time.Duration
+	ReceiveBackoff            RetrySettings
+	PublishBackoff            RetrySettings
+	Queue                     QueueSettings
 }
 
 type RetrySettings struct {
@@ -43,6 +44,7 @@ func LoadSettings() Settings {
 	settings.RawQueueURL = getDefaultString("RAW_QUEUE_URL", "http://localhost:4566/000000000000/raw-events")
 	settings.ProcessedQueueURL = getDefaultString("PROCESSED_QUEUE_URL", "http://localhost:4566/000000000000/processed-events")
 	settings.EventsTableName = getDefaultString("EVENTS_TABLE_NAME", "events")
+	settings.DeveloperSummaryTableName = getDefaultString("DEVELOPER_SUMMARY_TABLE_NAME", "developer_summary")
 	settings.Region = getDefaultString("REGION", "us-east-1")
 	settings.KeysAwsAccessKeyId = getDefaultString("AWS_ACCESS_KEY_ID", "test")
 	settings.KeysAwsSecretAccessKey = getDefaultString("AWS_SECRET_ACCESS_KEY", "test")
