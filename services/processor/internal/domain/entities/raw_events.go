@@ -3,12 +3,12 @@ package entities
 import "time"
 
 type RawEvent struct {
-	EventID     string `json:"event_id"`
-	DeveloperID string `json:"developer_id"`
-	MetricType  string `json:"metric_type"`
-	Value       int    `json:"value"`
-	Repository  string `json:"repository"`
-	Timestamp   string `json:"timestamp"`
+	EventID     string
+	DeveloperID string
+	MetricType  string
+	Value       int
+	Repository  string
+	Timestamp   string
 }
 
 func (e RawEvent) ToProcessed(processorID string, processedAt time.Time) ProcessedEvent {

@@ -5,7 +5,8 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
-	"processor/internal/domain/entities"
+	"processor/internal/dto"
+	"processor/internal/infra/clock"
 	"processor/internal/infra/config"
 	"processor/internal/infra/queue"
 	"processor/internal/infra/worker"
@@ -32,18 +33,19 @@ func main() {
 	}
 
 	var (
-		policy         = retry.NewPolicy(settings)
+		receivePolicy  = retryPolicy(settings.ReceiveBackoff)
+		publishPolicy  = retryPolicy(settings.PublishBackoff)
 		eventPublisher = queue.NewProcessedEventsPublisher(queueClient, settings.ProcessedQueueURL)
 		eventConsumer  = queue.NewRawEventsConsumer(queueClient, settings.RawQueueURL, settings.Queue)
-		consumer       = usecase.NewRawEventsConsumer(eventConsumer, policy)
+		consumer       = usecase.NewRawEventsConsumer(eventConsumer, receivePolicy)
 		processor      = usecase.NewEventProcessor(
 			eventPublisher,
 			eventConsumer,
-			entities.SystemClock{},
+			clock.SystemClock{},
 			settings.ProcessorID,
-			policy)
+			publishPolicy)
 		pool        = worker.NewPool(processor, settings.WorkerCount)
-		jobs        = make(chan entities.QueueMessage, settings.JobBufferSize)
+		jobs        = make(chan dto.QueueMessage, settings.JobBufferSize)
 		workersDone = make(chan struct{})
 	)
 
@@ -69,4 +71,13 @@ func main() {
 
 	slog.Info("processor stopped", "processor_id", settings.ProcessorID)
 
+}
+
+func retryPolicy(settings config.RetrySettings) retry.Policy {
+	return retry.Policy{
+		InitialBackoff: settings.InitialBackoff,
+		MaxBackoff:     settings.MaxBackoff,
+		Jitter:         settings.Jitter,
+		MaxAttempts:    settings.MaxAttempts,
+	}
 }

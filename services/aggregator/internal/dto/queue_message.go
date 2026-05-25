@@ -1,4 +1,4 @@
-package entities
+package dto
 
 type QueueMessage struct {
 	ID            string

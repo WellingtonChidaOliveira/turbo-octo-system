@@ -3,7 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
-	"processor/internal/domain/entities"
+	"processor/internal/dto"
 	"processor/internal/usecase/retry"
 	"testing"
 	"time"
@@ -11,11 +11,11 @@ import (
 
 type scriptedConsumer struct {
 	receiveCalls int
-	batches      [][]entities.QueueMessage
+	batches      [][]dto.QueueMessage
 	errs         []error
 }
 
-func (c *scriptedConsumer) Receive(ctx context.Context) ([]entities.QueueMessage, error) {
+func (c *scriptedConsumer) Receive(ctx context.Context) ([]dto.QueueMessage, error) {
 	call := c.receiveCalls
 	c.receiveCalls++
 	if call < len(c.errs) && c.errs[call] != nil {
@@ -35,12 +35,12 @@ func (c *scriptedConsumer) Delete(ctx context.Context, receiptHandle string) err
 func TestRawEventConsumer_DispatchesMessagesAndClosesJobsOnCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	consumer := &scriptedConsumer{
-		batches: [][]entities.QueueMessage{
+		batches: [][]dto.QueueMessage{
 			{{ID: "message-1"}, {ID: "message-2"}},
 		},
 	}
 	rawConsumer := NewRawEventsConsumer(consumer, retry.Policy{MaxAttempts: 1})
-	jobs := make(chan entities.QueueMessage, 2)
+	jobs := make(chan dto.QueueMessage, 2)
 
 	done := make(chan struct{})
 	go func() {
@@ -74,7 +74,7 @@ func TestRawEventConsumer_RetriesReceiveErrorWithBackoff(t *testing.T) {
 
 	consumer := &scriptedConsumer{
 		errs: []error{errors.New("receive failed")},
-		batches: [][]entities.QueueMessage{
+		batches: [][]dto.QueueMessage{
 			nil,
 			{{ID: "message-1"}},
 		},
@@ -84,7 +84,7 @@ func TestRawEventConsumer_RetriesReceiveErrorWithBackoff(t *testing.T) {
 		MaxBackoff:     0,
 		MaxAttempts:    1,
 	})
-	jobs := make(chan entities.QueueMessage, 1)
+	jobs := make(chan dto.QueueMessage, 1)
 
 	done := make(chan struct{})
 	go func() {

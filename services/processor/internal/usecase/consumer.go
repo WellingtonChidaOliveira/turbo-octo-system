@@ -3,7 +3,7 @@ package usecase
 import (
 	"context"
 	"log/slog"
-	"processor/internal/domain/entities"
+	"processor/internal/dto"
 	"processor/internal/usecase/ports"
 	"processor/internal/usecase/retry"
 )
@@ -20,7 +20,7 @@ func NewRawEventsConsumer(client ports.QueueConsumer, retryPolicy retry.Policy) 
 	}
 }
 
-func (c *RawEventConsumer) Consumer(ctx context.Context, jobs chan<- entities.QueueMessage) {
+func (c *RawEventConsumer) Consumer(ctx context.Context, jobs chan<- dto.QueueMessage) {
 	defer close(jobs)
 
 	attempt := 0
@@ -39,7 +39,7 @@ func (c *RawEventConsumer) Consumer(ctx context.Context, jobs chan<- entities.Qu
 	slog.Info("raw event consumer stopped")
 }
 
-func (c *RawEventConsumer) dispatchMessages(ctx context.Context, messages []entities.QueueMessage, jobs chan<- entities.QueueMessage) {
+func (c *RawEventConsumer) dispatchMessages(ctx context.Context, messages []dto.QueueMessage, jobs chan<- dto.QueueMessage) {
 	for _, msg := range messages {
 		select {
 		case <-ctx.Done():

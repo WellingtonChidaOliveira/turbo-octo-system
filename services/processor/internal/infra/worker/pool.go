@@ -3,12 +3,12 @@ package worker
 import (
 	"context"
 	"log/slog"
-	"processor/internal/domain/entities"
+	"processor/internal/dto"
 	"sync"
 )
 
 type Handler interface {
-	Handle(ctx context.Context, message entities.QueueMessage) error
+	Handle(ctx context.Context, message dto.QueueMessage) error
 }
 
 type Pool struct {
@@ -27,7 +27,7 @@ func NewPool(handler Handler, size int) *Pool {
 	}
 }
 
-func (p *Pool) Start(ctx context.Context, jobs <-chan entities.QueueMessage) {
+func (p *Pool) Start(ctx context.Context, jobs <-chan dto.QueueMessage) {
 	var wg sync.WaitGroup
 
 	for workerId := 1; workerId <= p.size; workerId++ {
@@ -38,7 +38,7 @@ func (p *Pool) Start(ctx context.Context, jobs <-chan entities.QueueMessage) {
 	wg.Wait()
 }
 
-func (p *Pool) runWorker(ctx context.Context, workerId int, jobs <-chan entities.QueueMessage, wg *sync.WaitGroup) {
+func (p *Pool) runWorker(ctx context.Context, workerId int, jobs <-chan dto.QueueMessage, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	for job := range jobs {
@@ -46,7 +46,7 @@ func (p *Pool) runWorker(ctx context.Context, workerId int, jobs <-chan entities
 	}
 }
 
-func (p *Pool) handleJob(ctx context.Context, workerId int, job entities.QueueMessage) {
+func (p *Pool) handleJob(ctx context.Context, workerId int, job dto.QueueMessage) {
 	if err := p.handler.Handle(ctx, job); err != nil {
 		slog.Error("worker failed to process message",
 			"worker_id", workerId,

@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"processor/internal/domain/entities"
+	"processor/internal/dto"
 	"processor/internal/usecase/retry"
 	"sync"
 	"testing"
@@ -19,7 +19,7 @@ type fakeConsumer struct {
 	deleteErr error
 }
 
-func (f *fakeConsumer) Receive(ctx context.Context) ([]entities.QueueMessage, error) {
+func (f *fakeConsumer) Receive(ctx context.Context) ([]dto.QueueMessage, error) {
 	return nil, nil
 }
 
@@ -42,7 +42,7 @@ type fakePublisher struct {
 	sendErr error
 }
 
-func (f *fakePublisher) Send(ctx context.Context, msg entities.QueueMessage) error {
+func (f *fakePublisher) Send(ctx context.Context, msg dto.QueueMessage) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.sent = append(f.sent, msg.Body)
@@ -74,12 +74,12 @@ func newTestProcessor(consumer *fakeConsumer, publisher *fakePublisher) *EventPr
 	return NewEventProcessor(publisher, consumer, clock, "processor-1", policy)
 }
 
-func validQueueMessage() entities.QueueMessage {
+func validQueueMessage() dto.QueueMessage {
 	return validQueueMessageWithReceipt("receipt-1")
 }
 
-func validQueueMessageWithReceipt(receiptHandle string) entities.QueueMessage {
-	return entities.QueueMessage{
+func validQueueMessageWithReceipt(receiptHandle string) dto.QueueMessage {
+	return dto.QueueMessage{
 		Body: `{
 	              "event_id": "550e8400-e29b-41d4-a716-446655440000",
               "developer_id": "dev-123",
@@ -115,7 +115,7 @@ func TestProcessMessage_ValidMessage_PublishesAndDeletes(t *testing.T) {
 		t.Fatalf("expected receipt-1 deleted, got %s", consumer.deleted[0])
 	}
 
-	var processed entities.ProcessedEvent
+	var processed dto.ProcessedEvent
 	err = json.Unmarshal([]byte(publisher.sent[0]), &processed)
 	if err != nil {
 		t.Fatal(err)
@@ -138,7 +138,7 @@ func TestProcessMessage_InvalidMessage_ReturnsError(t *testing.T) {
 	publisher := &fakePublisher{}
 	processor := newTestProcessor(consumer, publisher)
 
-	msg := entities.QueueMessage{
+	msg := dto.QueueMessage{
 		Body:          `invalid json`,
 		ReceiptHandle: "receipt-1",
 	}

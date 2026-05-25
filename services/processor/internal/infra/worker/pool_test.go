@@ -2,7 +2,7 @@ package worker
 
 import (
 	"context"
-	"processor/internal/domain/entities"
+	"processor/internal/dto"
 	"sync"
 	"testing"
 	"time"
@@ -14,7 +14,7 @@ type fakeHandler struct {
 	handleErr error
 }
 
-func (h *fakeHandler) Handle(ctx context.Context, message entities.QueueMessage) error {
+func (h *fakeHandler) Handle(ctx context.Context, message dto.QueueMessage) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.handled = append(h.handled, message.ID)
@@ -30,7 +30,7 @@ func (h *fakeHandler) handledCount() int {
 func TestPool_StartProcessesJobsUntilChannelCloses(t *testing.T) {
 	handler := &fakeHandler{}
 	pool := NewPool(handler, 2)
-	jobs := make(chan entities.QueueMessage, 2)
+	jobs := make(chan dto.QueueMessage, 2)
 
 	done := make(chan struct{})
 	go func() {
@@ -38,8 +38,8 @@ func TestPool_StartProcessesJobsUntilChannelCloses(t *testing.T) {
 		close(done)
 	}()
 
-	jobs <- entities.QueueMessage{ID: "message-1"}
-	jobs <- entities.QueueMessage{ID: "message-2"}
+	jobs <- dto.QueueMessage{ID: "message-1"}
+	jobs <- dto.QueueMessage{ID: "message-2"}
 	close(jobs)
 
 	select {
@@ -57,7 +57,7 @@ func TestPool_StartStopsWhenContextIsCanceled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	handler := &fakeHandler{}
 	pool := NewPool(handler, 2)
-	jobs := make(chan entities.QueueMessage)
+	jobs := make(chan dto.QueueMessage)
 
 	done := make(chan struct{})
 	go func() {

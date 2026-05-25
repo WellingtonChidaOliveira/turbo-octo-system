@@ -1,8 +1,8 @@
 package ports
 
 import (
+	"aggregator/internal/dto"
 	"context"
-	"processor/internal/dto"
 )
 
 type QueueConsumer interface {

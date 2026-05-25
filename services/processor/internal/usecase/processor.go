@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
-	"processor/internal/domain/entities"
+	"processor/internal/dto"
 	"processor/internal/usecase/ports"
 	"processor/internal/usecase/retry"
 )
@@ -32,11 +32,11 @@ func NewEventProcessor(
 	}
 }
 
-func (p *EventProcessor) Handle(ctx context.Context, message entities.QueueMessage) error {
+func (p *EventProcessor) Handle(ctx context.Context, message dto.QueueMessage) error {
 	return p.ProcessMessage(ctx, message)
 }
 
-func (p *EventProcessor) ProcessMessage(ctx context.Context, msg entities.QueueMessage) error {
+func (p *EventProcessor) ProcessMessage(ctx context.Context, msg dto.QueueMessage) error {
 	processedMsg, eventID, errorType, err := p.buildProcessedMessage(msg)
 	if err != nil {
 		processingErr := ProcessingError{Type: errorType, EventID: eventID, Err: err}
@@ -57,7 +57,7 @@ func (p *EventProcessor) ProcessMessage(ctx context.Context, msg entities.QueueM
 		"stage", "process",
 	)
 
-	if err = p.publishWithBackoff(ctx, eventID, msg.ID, entities.QueueMessage{Body: string(processedMsg)}); err != nil {
+	if err = p.publishWithBackoff(ctx, eventID, msg.ID, dto.QueueMessage{Body: string(processedMsg)}); err != nil {
 		return err
 	}
 
@@ -83,7 +83,7 @@ func (p *EventProcessor) ProcessMessage(ctx context.Context, msg entities.QueueM
 	return nil
 }
 
-func (p *EventProcessor) publishWithBackoff(ctx context.Context, eventID string, messageID string, msg entities.QueueMessage) error {
+func (p *EventProcessor) publishWithBackoff(ctx context.Context, eventID string, messageID string, msg dto.QueueMessage) error {
 	var err error
 	for attempt := 1; attempt <= p.retry.MaxAttempts; attempt++ {
 		err = p.publisher.Send(ctx, msg)
@@ -131,18 +131,19 @@ func (p *EventProcessor) publishWithBackoff(ctx context.Context, eventID string,
 	return ProcessingError{Type: ErrorTypePublish, EventID: eventID, Err: err}
 }
 
-func (p *EventProcessor) buildProcessedMessage(msg entities.QueueMessage) (string, string, ErrorType, error) {
-	var event entities.RawEvent
-	if err := json.Unmarshal([]byte(msg.Body), &event); err != nil {
+func (p *EventProcessor) buildProcessedMessage(msg dto.QueueMessage) (string, string, ErrorType, error) {
+	var eventDTO dto.RawEvent
+	if err := json.Unmarshal([]byte(msg.Body), &eventDTO); err != nil {
 		return "", "", ErrorTypeDecode, err
 	}
 
+	event := eventDTO.ToEntity()
 	if err := event.Validate(p.clock.Now()); err != nil {
 		return "", event.EventID, ErrorTypeValidation, err
 	}
 
 	processEvent := event.ToProcessed(p.processorID, p.clock.Now())
-	processedMsg, err := json.Marshal(processEvent)
+	processedMsg, err := json.Marshal(dto.NewProcessedEvent(processEvent))
 	if err != nil {
 		return "", event.EventID, ErrorTypeEncode, err
 	}

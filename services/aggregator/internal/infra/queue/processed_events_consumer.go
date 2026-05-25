@@ -1,34 +1,37 @@
 package queue
 
 import (
+	"aggregator/internal/dto"
+	"aggregator/internal/infra/config"
 	"context"
-	"processor/internal/dto"
-	"processor/internal/infra/config"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 )
 
-type RawEventsConsumer struct {
+type ProcessedEventsConsumer struct {
 	client   *sqs.Client
 	queueUrl string
-	settings config.QueueSettings
+	cfg      config.QueueSettings
 }
 
-func NewRawEventsConsumer(client *sqs.Client, queueUrl string, settings config.QueueSettings) *RawEventsConsumer {
-	return &RawEventsConsumer{
+func NewProcessedEventsConsumer(
+	client *sqs.Client,
+	queueUrl string,
+	cfg config.QueueSettings) *ProcessedEventsConsumer {
+	return &ProcessedEventsConsumer{
 		client:   client,
 		queueUrl: queueUrl,
-		settings: settings,
+		cfg:      cfg,
 	}
 }
 
-func (c *RawEventsConsumer) Receive(ctx context.Context) ([]dto.QueueMessage, error) {
+func (c *ProcessedEventsConsumer) Receive(ctx context.Context) ([]dto.QueueMessage, error) {
 	out, err := c.client.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{
 		QueueUrl:            aws.String(c.queueUrl),
-		MaxNumberOfMessages: c.settings.MaxNumberOfMessages,
-		WaitTimeSeconds:     c.settings.WaitTimeSeconds,
-		VisibilityTimeout:   c.settings.VisibilityTimeout,
+		MaxNumberOfMessages: c.cfg.MaxNumberOfMessages,
+		WaitTimeSeconds:     c.cfg.WaitTimeSeconds,
+		VisibilityTimeout:   c.cfg.VisibilityTimeout,
 	})
 	if err != nil {
 		return nil, err
@@ -46,7 +49,7 @@ func (c *RawEventsConsumer) Receive(ctx context.Context) ([]dto.QueueMessage, er
 	return queueMessages, nil
 }
 
-func (c *RawEventsConsumer) Delete(ctx context.Context, receiptHandle string) error {
+func (c *ProcessedEventsConsumer) Delete(ctx context.Context, receiptHandle string) error {
 	_, err := c.client.DeleteMessage(ctx, &sqs.DeleteMessageInput{
 		QueueUrl:      aws.String(c.queueUrl),
 		ReceiptHandle: aws.String(receiptHandle),
