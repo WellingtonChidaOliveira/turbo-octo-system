@@ -7,10 +7,10 @@ import (
 )
 
 type GetProcessedEventByID struct {
-	store ports.ProcessedEventStore
+	store ports.ProcessedEventReader
 }
 
-func NewGetProcessedEventByID(store ports.ProcessedEventStore) *GetProcessedEventByID {
+func NewGetProcessedEventByID(store ports.ProcessedEventReader) *GetProcessedEventByID {
 	return &GetProcessedEventByID{store: store}
 }
 

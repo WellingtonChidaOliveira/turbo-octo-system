@@ -13,14 +13,14 @@ type RawEventConsumer struct {
 	retry    retry.Policy
 }
 
-func NewRawEventsConsumer(client ports.QueueConsumer, retryPolicy retry.Policy) *RawEventConsumer {
+func NewRawEventConsumer(client ports.QueueConsumer, retryPolicy retry.Policy) *RawEventConsumer {
 	return &RawEventConsumer{
 		consumer: client,
 		retry:    retryPolicy.Normalize(),
 	}
 }
 
-func (c *RawEventConsumer) Consumer(ctx context.Context, jobs chan<- dto.QueueMessage) {
+func (c *RawEventConsumer) Start(ctx context.Context, jobs chan<- dto.QueueMessage) {
 	defer close(jobs)
 
 	attempt := 0

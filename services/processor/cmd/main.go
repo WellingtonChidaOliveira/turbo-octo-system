@@ -33,17 +33,16 @@ func main() {
 	}
 
 	var (
-		receivePolicy  = retryPolicy(settings.ReceiveBackoff)
-		publishPolicy  = retryPolicy(settings.PublishBackoff)
+		policies       = retry.NewPolicy(settings)
 		eventPublisher = queue.NewProcessedEventsPublisher(queueClient, settings.ProcessedQueueURL)
-		eventConsumer  = queue.NewRawEventsConsumer(queueClient, settings.RawQueueURL, settings.Queue)
-		consumer       = usecase.NewRawEventsConsumer(eventConsumer, receivePolicy)
+		eventConsumer  = queue.NewRawEventConsumer(queueClient, settings.RawQueueURL, settings.Queue)
+		consumer       = usecase.NewRawEventConsumer(eventConsumer, policies)
 		processor      = usecase.NewEventProcessor(
 			eventPublisher,
 			eventConsumer,
 			clock.SystemClock{},
 			settings.ProcessorID,
-			publishPolicy)
+			policies)
 		pool        = worker.NewPool(processor, settings.WorkerCount)
 		jobs        = make(chan dto.QueueMessage, settings.JobBufferSize)
 		workersDone = make(chan struct{})
@@ -59,7 +58,7 @@ func main() {
 		close(workersDone)
 	}()
 
-	consumer.Consumer(ctx, jobs)
+	consumer.Start(ctx, jobs)
 	select {
 	case <-workersDone:
 	case <-time.After(settings.ShutdownTimeout):
@@ -71,13 +70,4 @@ func main() {
 
 	slog.Info("processor stopped", "processor_id", settings.ProcessorID)
 
-}
-
-func retryPolicy(settings config.RetrySettings) retry.Policy {
-	return retry.Policy{
-		InitialBackoff: settings.InitialBackoff,
-		MaxBackoff:     settings.MaxBackoff,
-		Jitter:         settings.Jitter,
-		MaxAttempts:    settings.MaxAttempts,
-	}
 }

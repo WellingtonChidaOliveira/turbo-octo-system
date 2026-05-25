@@ -7,21 +7,41 @@ import (
 )
 
 type Settings struct {
-	ProcessorID               string
-	AwsEndpointURL            string
-	RawQueueURL               string
-	ProcessedQueueURL         string
+	AWS             AWSSettings
+	Queue           QueueSettings
+	Dynamo          DynamoSettings
+	API             APISettings
+	Worker          WorkerSettings
+	ReceiveBackoff  RetrySettings
+	ShutdownTimeout time.Duration
+}
+
+type AWSSettings struct {
+	EndpointURL     string
+	Region          string
+	AccessKeyID     string
+	SecretAccessKey string
+}
+
+type QueueSettings struct {
+	ProcessedQueueURL   string
+	MaxNumberOfMessages int32
+	WaitTimeSeconds     int32
+	VisibilityTimeout   int32
+}
+
+type DynamoSettings struct {
 	EventsTableName           string
 	DeveloperSummaryTableName string
-	Region                    string
-	KeysAwsAccessKeyId        string
-	KeysAwsSecretAccessKey    string
-	WorkerCount               int
-	JobBufferSize             int
-	ShutdownTimeout           time.Duration
-	ReceiveBackoff            RetrySettings
-	PublishBackoff            RetrySettings
-	Queue                     QueueSettings
+}
+
+type APISettings struct {
+	Port string
+}
+
+type WorkerSettings struct {
+	Count         int
+	JobBufferSize int
 }
 
 type RetrySettings struct {
@@ -31,43 +51,39 @@ type RetrySettings struct {
 	MaxAttempts    int
 }
 
-type QueueSettings struct {
-	MaxNumberOfMessages int32
-	WaitTimeSeconds     int32
-	VisibilityTimeout   int32
-}
-
 func LoadSettings() Settings {
 	var settings Settings
-	settings.ProcessorID = getDefaultString("PROCESSOR_ID", "processor-1")
-	settings.AwsEndpointURL = getDefaultString("AWS_ENDPOINT_URL", getDefaultString("QUEUE_URL", "http://localhost:4566/"))
-	settings.RawQueueURL = getDefaultString("RAW_QUEUE_URL", "http://localhost:4566/000000000000/raw-events")
-	settings.ProcessedQueueURL = getDefaultString("PROCESSED_QUEUE_URL", "http://localhost:4566/000000000000/processed-events")
-	settings.EventsTableName = getDefaultString("EVENTS_TABLE_NAME", "events")
-	settings.DeveloperSummaryTableName = getDefaultString("DEVELOPER_SUMMARY_TABLE_NAME", "developer_summary")
-	settings.Region = getDefaultString("REGION", "us-east-1")
-	settings.KeysAwsAccessKeyId = getDefaultString("AWS_ACCESS_KEY_ID", "test")
-	settings.KeysAwsSecretAccessKey = getDefaultString("AWS_SECRET_ACCESS_KEY", "test")
-	settings.WorkerCount = normalizeWorkerCount(getDefaultInt("WORKER_COUNT", 5))
-	settings.JobBufferSize = normalizePositiveInt(getDefaultInt("JOB_BUFFER_SIZE", settings.WorkerCount*2), settings.WorkerCount*2)
-	settings.ShutdownTimeout = getDuration("SHUTDOWN_TIMEOUT", 30*time.Second)
+	settings.AWS = AWSSettings{
+		EndpointURL:     getDefaultString("AWS_ENDPOINT_URL", getDefaultString("QUEUE_URL", "http://localhost:4566/")),
+		Region:          getDefaultString("AWS_REGION", getDefaultString("REGION", "us-east-1")),
+		AccessKeyID:     getDefaultString("AWS_ACCESS_KEY_ID", "test"),
+		SecretAccessKey: getDefaultString("AWS_SECRET_ACCESS_KEY", "test"),
+	}
+	settings.Queue = QueueSettings{
+		ProcessedQueueURL:   getDefaultString("PROCESSED_QUEUE_URL", "http://localhost:4566/000000000000/processed-events"),
+		MaxNumberOfMessages: int32(normalizePositiveInt(getDefaultInt("SQS_MAX_NUMBER_OF_MESSAGES", 10), 10)),
+		WaitTimeSeconds:     int32(normalizeNonNegativeInt(getDefaultInt("SQS_WAIT_TIME_SECONDS", 20), 20)),
+		VisibilityTimeout:   int32(normalizePositiveInt(getDefaultInt("SQS_VISIBILITY_TIMEOUT_SECONDS", 30), 30)),
+	}
+	settings.Dynamo = DynamoSettings{
+		EventsTableName:           getDefaultString("EVENTS_TABLE_NAME", "events"),
+		DeveloperSummaryTableName: getDefaultString("DEVELOPER_SUMMARY_TABLE_NAME", "developer_summary"),
+	}
+	settings.API = APISettings{
+		Port: getDefaultString("API_PORT", "8080"),
+	}
+	workerCount := normalizeWorkerCount(getDefaultInt("WORKER_COUNT", 5))
+	settings.Worker = WorkerSettings{
+		Count:         workerCount,
+		JobBufferSize: normalizePositiveInt(getDefaultInt("JOB_BUFFER_SIZE", workerCount*2), workerCount*2),
+	}
 	settings.ReceiveBackoff = RetrySettings{
 		InitialBackoff: getDuration("RECEIVE_BACKOFF_INITIAL", 1*time.Second),
 		MaxBackoff:     getDuration("RECEIVE_BACKOFF_MAX", 30*time.Second),
 		Jitter:         getDuration("RECEIVE_BACKOFF_JITTER", 250*time.Millisecond),
 		MaxAttempts:    normalizePositiveInt(getDefaultInt("RECEIVE_MAX_ATTEMPTS", 0), 0),
 	}
-	settings.PublishBackoff = RetrySettings{
-		InitialBackoff: getDuration("PUBLISH_BACKOFF_INITIAL", 100*time.Millisecond),
-		MaxBackoff:     getDuration("PUBLISH_BACKOFF_MAX", 2*time.Second),
-		Jitter:         getDuration("PUBLISH_BACKOFF_JITTER", 50*time.Millisecond),
-		MaxAttempts:    normalizePositiveInt(getDefaultInt("PUBLISH_MAX_ATTEMPTS", 3), 3),
-	}
-	settings.Queue = QueueSettings{
-		MaxNumberOfMessages: int32(normalizePositiveInt(getDefaultInt("SQS_MAX_NUMBER_OF_MESSAGES", 10), 10)),
-		WaitTimeSeconds:     int32(normalizeNonNegativeInt(getDefaultInt("SQS_WAIT_TIME_SECONDS", 20), 20)),
-		VisibilityTimeout:   int32(normalizePositiveInt(getDefaultInt("SQS_VISIBILITY_TIMEOUT_SECONDS", 30), 30)),
-	}
+	settings.ShutdownTimeout = getDuration("SHUTDOWN_TIMEOUT", 30*time.Second)
 
 	return settings
 }

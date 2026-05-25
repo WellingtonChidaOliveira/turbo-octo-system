@@ -9,23 +9,23 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 )
 
-type RawEventsConsumer struct {
+type RawEventConsumer struct {
 	client   *sqs.Client
-	queueUrl string
+	queueURL string
 	settings config.QueueSettings
 }
 
-func NewRawEventsConsumer(client *sqs.Client, queueUrl string, settings config.QueueSettings) *RawEventsConsumer {
-	return &RawEventsConsumer{
+func NewRawEventConsumer(client *sqs.Client, queueURL string, settings config.QueueSettings) *RawEventConsumer {
+	return &RawEventConsumer{
 		client:   client,
-		queueUrl: queueUrl,
+		queueURL: queueURL,
 		settings: settings,
 	}
 }
 
-func (c *RawEventsConsumer) Receive(ctx context.Context) ([]dto.QueueMessage, error) {
+func (c *RawEventConsumer) Receive(ctx context.Context) ([]dto.QueueMessage, error) {
 	out, err := c.client.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{
-		QueueUrl:            aws.String(c.queueUrl),
+		QueueUrl:            aws.String(c.queueURL),
 		MaxNumberOfMessages: c.settings.MaxNumberOfMessages,
 		WaitTimeSeconds:     c.settings.WaitTimeSeconds,
 		VisibilityTimeout:   c.settings.VisibilityTimeout,
@@ -46,9 +46,9 @@ func (c *RawEventsConsumer) Receive(ctx context.Context) ([]dto.QueueMessage, er
 	return queueMessages, nil
 }
 
-func (c *RawEventsConsumer) Delete(ctx context.Context, receiptHandle string) error {
+func (c *RawEventConsumer) Delete(ctx context.Context, receiptHandle string) error {
 	_, err := c.client.DeleteMessage(ctx, &sqs.DeleteMessageInput{
-		QueueUrl:      aws.String(c.queueUrl),
+		QueueUrl:      aws.String(c.queueURL),
 		ReceiptHandle: aws.String(receiptHandle),
 	})
 	return err

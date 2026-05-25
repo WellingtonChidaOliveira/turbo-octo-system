@@ -3,7 +3,6 @@ package retry
 import (
 	"context"
 	"math/rand"
-	"processor/internal/infra/config"
 	"time"
 )
 
@@ -12,15 +11,6 @@ type Policy struct {
 	MaxBackoff     time.Duration
 	Jitter         time.Duration
 	MaxAttempts    int
-}
-
-func NewPolicy(cfg config.Settings) Policy {
-	return Policy{
-		cfg.PublishBackoff.InitialBackoff,
-		cfg.PublishBackoff.MaxBackoff,
-		cfg.PublishBackoff.Jitter,
-		cfg.PublishBackoff.MaxAttempts,
-	}
 }
 
 func (p Policy) Normalize() Policy {

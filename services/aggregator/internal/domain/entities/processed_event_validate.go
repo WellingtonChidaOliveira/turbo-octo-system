@@ -6,59 +6,59 @@ import (
 	"time"
 )
 
-var validMetricTypes = map[string]struct{}{
-	"commits":             {},
-	"pull_requests":       {},
-	"review_time_minutes": {},
+var validProcessedMetricTypes = map[string]struct{}{
+	MetricCommits:           {},
+	MetricPullRequests:      {},
+	MetricReviewTimeMinutes: {},
 }
 
-func (e RawEvent) Validate(now time.Time) error {
+func (e ProcessedEvent) Validate() error {
 	if err := e.validateIdentity(); err != nil {
 		return err
 	}
 	if err := e.validateMetric(); err != nil {
 		return err
 	}
-	return e.validateTimestamp(now)
+	return e.validateTimestamps()
 }
 
-func (e RawEvent) validateIdentity() error {
+func (e ProcessedEvent) validateIdentity() error {
 	if !isUUIDV4(e.EventID) {
 		return errors.New("event_id is required and must be a valid UUID v4")
 	}
 	if strings.TrimSpace(e.DeveloperID) == "" {
 		return errors.New("developer_id is required")
 	}
+	if strings.TrimSpace(e.Repository) == "" {
+		return errors.New("repository is required")
+	}
+	if strings.TrimSpace(e.ProcessorID) == "" {
+		return errors.New("processor_id is required")
+	}
 	return nil
 }
 
-func (e RawEvent) validateMetric() error {
-	if !isValidMetricType(e.MetricType) {
+func (e ProcessedEvent) validateMetric() error {
+	if _, ok := validProcessedMetricTypes[e.MetricType]; !ok {
 		return errors.New("metric_type is invalid")
 	}
 	if e.Value < 0 {
 		return errors.New("value must be greater than or equal to zero")
 	}
-	if e.MetricType == "review_time_minutes" && e.Value > 1440 {
+	if e.MetricType == MetricReviewTimeMinutes && e.Value > 1440 {
 		return errors.New("review_time_minutes cannot be greater than 1440")
 	}
 	return nil
 }
 
-func (e RawEvent) validateTimestamp(now time.Time) error {
-	eventTime, err := time.Parse(time.RFC3339, e.Timestamp)
-	if err != nil {
-		return errors.New("timestamp is required")
+func (e ProcessedEvent) validateTimestamps() error {
+	if _, err := time.Parse(time.RFC3339, e.Timestamp); err != nil {
+		return errors.New("timestamp is required and must be RFC3339")
 	}
-	if eventTime.After(now.UTC()) {
-		return errors.New("timestamp cannot be in the future")
+	if _, err := time.Parse(time.RFC3339, e.ProcessedAt); err != nil {
+		return errors.New("processed_at is required and must be RFC3339")
 	}
 	return nil
-}
-
-func isValidMetricType(metricType string) bool {
-	_, ok := validMetricTypes[metricType]
-	return ok
 }
 
 func isUUIDV4(value string) bool {

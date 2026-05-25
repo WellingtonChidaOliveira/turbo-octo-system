@@ -12,7 +12,7 @@ import (
 
 func NewQueueClient(ctx context.Context, setting conf.Settings) (*sqs.Client, error) {
 	cfg, err := config.LoadDefaultConfig(ctx,
-		config.WithRegion(setting.Region),
+		config.WithRegion(setting.AWSRegion),
 		config.WithCredentialsProvider(
 			credentials.NewStaticCredentialsProvider(setting.KeysAwsAccessKeyId, setting.KeysAwsSecretAccessKey, ""),
 		),
@@ -23,7 +23,7 @@ func NewQueueClient(ctx context.Context, setting conf.Settings) (*sqs.Client, er
 	}
 
 	client := sqs.NewFromConfig(cfg, func(o *sqs.Options) {
-		o.BaseEndpoint = aws.String(setting.QueueUrl)
+		o.BaseEndpoint = aws.String(setting.AWSEndpointURL)
 	})
 	return client, nil
 }

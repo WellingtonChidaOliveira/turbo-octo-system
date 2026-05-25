@@ -13,11 +13,11 @@ import (
 func NewDynamoClient(ctx context.Context, cfg config.Settings) (*dynamodb.Client, error) {
 	awsCfg, err := awsconfig.LoadDefaultConfig(
 		ctx,
-		awsconfig.WithRegion(cfg.Region),
+		awsconfig.WithRegion(cfg.AWS.Region),
 		awsconfig.WithCredentialsProvider(
 			credentials.NewStaticCredentialsProvider(
-				cfg.KeysAwsAccessKeyId,
-				cfg.KeysAwsSecretAccessKey,
+				cfg.AWS.AccessKeyID,
+				cfg.AWS.SecretAccessKey,
 				"",
 			),
 		),
@@ -27,6 +27,6 @@ func NewDynamoClient(ctx context.Context, cfg config.Settings) (*dynamodb.Client
 	}
 
 	return dynamodb.NewFromConfig(awsCfg, func(o *dynamodb.Options) {
-		o.BaseEndpoint = aws.String(cfg.AwsEndpointURL)
+		o.BaseEndpoint = aws.String(cfg.AWS.EndpointURL)
 	}), nil
 }

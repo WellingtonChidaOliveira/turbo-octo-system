@@ -1,12 +1,14 @@
 package main
 
 import (
-	"aggregator/internal/dto"
+	"aggregator/internal/infra/api"
 	"aggregator/internal/infra/config"
 	"aggregator/internal/infra/queue"
 	"aggregator/internal/infra/repository"
+	"aggregator/internal/infra/runtime"
 	"aggregator/internal/infra/worker"
 	"aggregator/internal/usecase"
+	"aggregator/internal/usecase/retry"
 	"context"
 	"log/slog"
 	"os"
@@ -15,10 +17,13 @@ import (
 )
 
 func main() {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	})))
 
 	cfg := config.LoadSettings()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	queueClient, err := queue.NewQueueClient(ctx, cfg)
 	if err != nil {
@@ -33,14 +38,33 @@ func main() {
 	}
 
 	var (
-		eventConsumer = queue.NewProcessedEventsConsumer(queueClient, cfg.ProcessedQueueURL, cfg.Queue)
-		consumer      = usecase.NewProcessedEventConsumer(eventConsumer)
-		eventStore    = repository.NewDynamoEventStore(dynamoClient, cfg.EventsTableName, cfg.DeveloperSummaryTableName)
-		persistData   = usecase.NewPersistDataHandler(eventStore, eventConsumer)
-		workerPool    = worker.NewPool(persistData, cfg.WorkerCount)
-		jobs          = make(chan dto.QueueMessage, cfg.JobBufferSize)
+		processedEventsQueue = queue.NewProcessedEventConsumer(queueClient, cfg.Queue.ProcessedQueueURL, cfg.Queue)
+		eventStore           = repository.NewDynamoEventStore(dynamoClient, cfg.Dynamo.EventsTableName, cfg.Dynamo.DeveloperSummaryTableName)
+
+		receivePolicy          = retryPolicy(cfg.ReceiveBackoff)
+		processedEventConsumer = usecase.NewProcessedEventConsumer(processedEventsQueue, receivePolicy)
+		persistData            = usecase.NewPersistProcessedEventHandler(eventStore, processedEventsQueue)
+		eventsGetter           = usecase.NewGetProcessedEventsByDeveloper(eventStore)
+		summaryGetter          = usecase.NewGetDeveloperSummary(eventStore)
+
+		apiServer = api.NewServer(
+			":"+cfg.API.Port,
+			api.NewHealthHandler(processedEventsQueue, eventStore),
+			api.NewMetricsHandler(eventsGetter),
+			api.NewSummaryHandler(summaryGetter),
+		)
+		workerPool = worker.NewPool(persistData, cfg.Worker.Count)
+		service    = runtime.NewService(processedEventConsumer, workerPool, apiServer, cfg)
 	)
 
-	go consumer.Handle(ctx, jobs)
-	workerPool.Start(ctx, jobs)
+	service.Run(ctx, stop)
+}
+
+func retryPolicy(settings config.RetrySettings) retry.Policy {
+	return retry.Policy{
+		InitialBackoff: settings.InitialBackoff,
+		MaxBackoff:     settings.MaxBackoff,
+		Jitter:         settings.Jitter,
+		MaxAttempts:    settings.MaxAttempts,
+	}
 }

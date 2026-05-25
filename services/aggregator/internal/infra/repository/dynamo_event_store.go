@@ -36,6 +36,21 @@ func (s *DynamoEventStore) SaveEventAndIncrementSummary(ctx context.Context, eve
 	return mapDynamoWriteError(err)
 }
 
+func (s *DynamoEventStore) UpdateLastActivityIfNewer(ctx context.Context, developerID string, timestamp string) error {
+	_, err := s.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName: aws.String(s.summaryTableName),
+		Key: map[string]types.AttributeValue{
+			"developer_id": &types.AttributeValueMemberS{Value: developerID},
+		},
+		UpdateExpression:    aws.String("SET last_activity = :last_activity"),
+		ConditionExpression: aws.String("attribute_not_exists(last_activity) OR last_activity < :last_activity"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":last_activity": &types.AttributeValueMemberS{Value: timestamp},
+		},
+	})
+	return mapDynamoConditionalUpdateError(err)
+}
+
 func (s *DynamoEventStore) FindByID(ctx context.Context, eventID string) (entities.ProcessedEvent, error) {
 	out, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
 		TableName: aws.String(s.eventsTableName),
@@ -106,4 +121,17 @@ func (s *DynamoEventStore) FindSummaryByDeveloperID(ctx context.Context, develop
 		return entities.DeveloperSummary{}, err
 	}
 	return record.ToEntity(), nil
+}
+
+func (s *DynamoEventStore) CheckStorage(ctx context.Context) error {
+	if _, err := s.client.DescribeTable(ctx, &dynamodb.DescribeTableInput{
+		TableName: aws.String(s.eventsTableName),
+	}); err != nil {
+		return err
+	}
+
+	_, err := s.client.DescribeTable(ctx, &dynamodb.DescribeTableInput{
+		TableName: aws.String(s.summaryTableName),
+	})
+	return err
 }

@@ -3,20 +3,20 @@ set -euo pipefail
 
 export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:-test}"
 export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:-test}"
-export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-us-east-1}"
+export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-${AWS_REGION:-us-east-1}}"
 
-ENDPOINT_URL="${ENDPOINT_URL:-http://localhost:4566}"
-QUEUE_URL="${RAW_QUEUE_URL:-http://localhost:4566/000000000000/raw-events}"
+AWS_ENDPOINT_URL="${AWS_ENDPOINT_URL:-${ENDPOINT_URL:-http://localhost:4566}}"
+RAW_QUEUE_URL="${RAW_QUEUE_URL:-http://localhost:4566/000000000000/raw-events}"
 
 send_message() {
   local body="$1"
-  aws --endpoint-url="$ENDPOINT_URL" sqs send-message \
-    --queue-url "$QUEUE_URL" \
-    --region us-east-1 \
+  aws --endpoint-url="$AWS_ENDPOINT_URL" sqs send-message \
+    --queue-url "$RAW_QUEUE_URL" \
+    --region "$AWS_DEFAULT_REGION" \
     --message-body "$body" >/dev/null
 }
 
-echo "Seeding raw-events queue at $QUEUE_URL"
+echo "Seeding raw-events queue at $RAW_QUEUE_URL"
 
 send_message '{"event_id":"550e8400-e29b-41d4-a716-446655440000","developer_id":"dev-001","metric_type":"commits","value":12,"repository":"org/api","timestamp":"2026-04-15T10:30:00Z"}'
 send_message '{"event_id":"550e8400-e29b-41d4-a716-446655440001","developer_id":"dev-001","metric_type":"pull_requests","value":3,"repository":"org/api","timestamp":"2026-04-15T10:31:00Z"}'

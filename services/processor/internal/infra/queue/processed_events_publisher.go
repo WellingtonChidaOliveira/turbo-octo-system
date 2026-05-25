@@ -10,19 +10,19 @@ import (
 
 type ProcessedEventsPublisher struct {
 	client   *sqs.Client
-	queueUrl string
+	queueURL string
 }
 
-func NewProcessedEventsPublisher(client *sqs.Client, queueUrl string) *ProcessedEventsPublisher {
+func NewProcessedEventsPublisher(client *sqs.Client, queueURL string) *ProcessedEventsPublisher {
 	return &ProcessedEventsPublisher{
 		client:   client,
-		queueUrl: queueUrl,
+		queueURL: queueURL,
 	}
 }
 
 func (p *ProcessedEventsPublisher) Send(ctx context.Context, message dto.QueueMessage) error {
 	_, err := p.client.SendMessage(ctx, &sqs.SendMessageInput{
-		QueueUrl:    aws.String(p.queueUrl),
+		QueueUrl:    aws.String(p.queueURL),
 		MessageBody: aws.String(message.Body),
 	})
 	return err

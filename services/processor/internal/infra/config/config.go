@@ -8,10 +8,10 @@ import (
 
 type Settings struct {
 	ProcessorID            string
-	QueueUrl               string
+	AWSEndpointURL         string
 	RawQueueURL            string
 	ProcessedQueueURL      string
-	Region                 string
+	AWSRegion              string
 	KeysAwsAccessKeyId     string
 	KeysAwsSecretAccessKey string
 	WorkerCount            int
@@ -38,10 +38,10 @@ type QueueSettings struct {
 func LoadSettings() Settings {
 	var settings Settings
 	settings.ProcessorID = getDefaultString("PROCESSOR_ID", "processor-1")
-	settings.QueueUrl = getDefaultString("QUEUE_URL", "http://localhost:4566/")
+	settings.AWSEndpointURL = getDefaultString("AWS_ENDPOINT_URL", getDefaultString("QUEUE_URL", "http://localhost:4566/"))
 	settings.RawQueueURL = getDefaultString("RAW_QUEUE_URL", "http://localhost:4566/000000000000/raw-events")
 	settings.ProcessedQueueURL = getDefaultString("PROCESSED_QUEUE_URL", "http://localhost:4566/000000000000/processed-events")
-	settings.Region = getDefaultString("REGION", "us-east-1")
+	settings.AWSRegion = getDefaultString("AWS_REGION", getDefaultString("REGION", "us-east-1"))
 	settings.KeysAwsAccessKeyId = getDefaultString("AWS_ACCESS_KEY_ID", "test")
 	settings.KeysAwsSecretAccessKey = getDefaultString("AWS_SECRET_ACCESS_KEY", "test")
 	settings.WorkerCount = normalizeWorkerCount(getDefaultInt("WORKER_COUNT", 5))

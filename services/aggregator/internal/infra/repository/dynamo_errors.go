@@ -31,3 +31,16 @@ func isConditionalCheckFailure(err error) bool {
 	}
 	return false
 }
+
+func mapDynamoConditionalUpdateError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	var conditionalErr *types.ConditionalCheckFailedException
+	if errors.As(err, &conditionalErr) {
+		return nil
+	}
+
+	return err
+}

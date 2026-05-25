@@ -7,28 +7,29 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 )
 
-type ProcessedEventsConsumer struct {
+type ProcessedEventConsumer struct {
 	client   *sqs.Client
-	queueUrl string
+	queueURL string
 	cfg      config.QueueSettings
 }
 
-func NewProcessedEventsConsumer(
+func NewProcessedEventConsumer(
 	client *sqs.Client,
-	queueUrl string,
-	cfg config.QueueSettings) *ProcessedEventsConsumer {
-	return &ProcessedEventsConsumer{
+	queueURL string,
+	cfg config.QueueSettings) *ProcessedEventConsumer {
+	return &ProcessedEventConsumer{
 		client:   client,
-		queueUrl: queueUrl,
+		queueURL: queueURL,
 		cfg:      cfg,
 	}
 }
 
-func (c *ProcessedEventsConsumer) Receive(ctx context.Context) ([]dto.QueueMessage, error) {
+func (c *ProcessedEventConsumer) Receive(ctx context.Context) ([]dto.QueueMessage, error) {
 	out, err := c.client.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{
-		QueueUrl:            aws.String(c.queueUrl),
+		QueueUrl:            aws.String(c.queueURL),
 		MaxNumberOfMessages: c.cfg.MaxNumberOfMessages,
 		WaitTimeSeconds:     c.cfg.WaitTimeSeconds,
 		VisibilityTimeout:   c.cfg.VisibilityTimeout,
@@ -49,10 +50,20 @@ func (c *ProcessedEventsConsumer) Receive(ctx context.Context) ([]dto.QueueMessa
 	return queueMessages, nil
 }
 
-func (c *ProcessedEventsConsumer) Delete(ctx context.Context, receiptHandle string) error {
+func (c *ProcessedEventConsumer) Delete(ctx context.Context, receiptHandle string) error {
 	_, err := c.client.DeleteMessage(ctx, &sqs.DeleteMessageInput{
-		QueueUrl:      aws.String(c.queueUrl),
+		QueueUrl:      aws.String(c.queueURL),
 		ReceiptHandle: aws.String(receiptHandle),
+	})
+	return err
+}
+
+func (c *ProcessedEventConsumer) CheckQueue(ctx context.Context) error {
+	_, err := c.client.GetQueueAttributes(ctx, &sqs.GetQueueAttributesInput{
+		QueueUrl: aws.String(c.queueURL),
+		AttributeNames: []types.QueueAttributeName{
+			types.QueueAttributeNameQueueArn,
+		},
 	})
 	return err
 }

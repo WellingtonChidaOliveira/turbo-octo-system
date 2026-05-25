@@ -13,7 +13,3 @@ type QueueConsumer interface {
 type QueueDeleter interface {
 	Delete(ctx context.Context, receiptHandle string) error
 }
-
-type QueuePublisher interface {
-	Send(ctx context.Context, message dto.QueueMessage) error
-}

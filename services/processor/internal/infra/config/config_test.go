@@ -33,3 +33,19 @@ func TestLoadSettings_LoadsQueueSettings(t *testing.T) {
 		t.Fatalf("expected visibility timeout 45, got %d", settings.Queue.VisibilityTimeout)
 	}
 }
+
+func TestLoadSettings_PrefersAWSNamesAndKeepsLegacyAliases(t *testing.T) {
+	t.Setenv("AWS_ENDPOINT_URL", "http://aws-endpoint:4566")
+	t.Setenv("QUEUE_URL", "http://legacy-queue:4566")
+	t.Setenv("AWS_REGION", "sa-east-1")
+	t.Setenv("REGION", "us-east-1")
+
+	settings := LoadSettings()
+
+	if settings.AWSEndpointURL != "http://aws-endpoint:4566" {
+		t.Fatalf("expected preferred endpoint, got %s", settings.AWSEndpointURL)
+	}
+	if settings.AWSRegion != "sa-east-1" {
+		t.Fatalf("expected preferred region, got %s", settings.AWSRegion)
+	}
+}

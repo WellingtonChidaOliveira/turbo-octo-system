@@ -44,13 +44,11 @@ func buildIncrementSummaryItem(table string, delta entities.DeveloperSummary) ty
 				"developer_id": &types.AttributeValueMemberS{Value: delta.DeveloperID},
 			},
 			UpdateExpression: aws.String(
-				"SET last_activity = :last_activity " +
-					"ADD total_commits :total_commits, total_pull_requests :total_pull_requests, " +
+				"ADD total_commits :total_commits, total_pull_requests :total_pull_requests, " +
 					"total_review_time_minutes :total_review_time_minutes, review_time_events :review_time_events, " +
 					"events_processed :events_processed",
 			),
 			ExpressionAttributeValues: map[string]types.AttributeValue{
-				":last_activity":             &types.AttributeValueMemberS{Value: delta.LastActivity},
 				":total_commits":             &types.AttributeValueMemberN{Value: intToString(delta.TotalCommits)},
 				":total_pull_requests":       &types.AttributeValueMemberN{Value: intToString(delta.TotalPullRequests)},
 				":total_review_time_minutes": &types.AttributeValueMemberN{Value: intToString(delta.TotalReviewTimeMinutes)},

@@ -4,13 +4,13 @@ set -euo pipefail
 export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-us-east-1}"
 
 # Filas SQS
-aws --endpoint-url=http://localhost:4566 sqs create-queue --queue-name raw-events-dlq
+aws --endpoint-url=http://localhost:4566 sqs create-queue --queue-name raw-events-dlq || true
 aws --endpoint-url=http://localhost:4566 sqs create-queue --queue-name raw-events \
-  --attributes '{"RedrivePolicy": "{\"deadLetterTargetArn\":\"arn:aws:sqs:us-east-1:000000000000:raw-events-dlq\",\"maxReceiveCount\":\"3\"}"}'
+  --attributes '{"RedrivePolicy": "{\"deadLetterTargetArn\":\"arn:aws:sqs:us-east-1:000000000000:raw-events-dlq\",\"maxReceiveCount\":\"3\"}"}' || true
 
-aws --endpoint-url=http://localhost:4566 sqs create-queue --queue-name processed-events-dlq
+aws --endpoint-url=http://localhost:4566 sqs create-queue --queue-name processed-events-dlq || true
 aws --endpoint-url=http://localhost:4566 sqs create-queue --queue-name processed-events \
-  --attributes '{"RedrivePolicy": "{\"deadLetterTargetArn\":\"arn:aws:sqs:us-east-1:000000000000:processed-events-dlq\",\"maxReceiveCount\":\"3\"}"}'
+  --attributes '{"RedrivePolicy": "{\"deadLetterTargetArn\":\"arn:aws:sqs:us-east-1:000000000000:processed-events-dlq\",\"maxReceiveCount\":\"3\"}"}' || true
 
 # Tabelas DynamoDB
 aws --endpoint-url=http://localhost:4566 dynamodb create-table \
@@ -27,10 +27,10 @@ aws --endpoint-url=http://localhost:4566 dynamodb create-table \
       "Projection": {"ProjectionType": "ALL"}
     }
   ]' \
-  --billing-mode PAY_PER_REQUEST
+  --billing-mode PAY_PER_REQUEST || true
 
 aws --endpoint-url=http://localhost:4566 dynamodb create-table \
   --table-name developer_summary \
   --attribute-definitions AttributeName=developer_id,AttributeType=S \
   --key-schema AttributeName=developer_id,KeyType=HASH \
-  --billing-mode PAY_PER_REQUEST
+  --billing-mode PAY_PER_REQUEST || true

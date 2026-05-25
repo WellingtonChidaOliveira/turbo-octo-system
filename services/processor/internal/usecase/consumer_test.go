@@ -39,12 +39,12 @@ func TestRawEventConsumer_DispatchesMessagesAndClosesJobsOnCancel(t *testing.T) 
 			{{ID: "message-1"}, {ID: "message-2"}},
 		},
 	}
-	rawConsumer := NewRawEventsConsumer(consumer, retry.Policy{MaxAttempts: 1})
+	rawConsumer := NewRawEventConsumer(consumer, retry.Policy{MaxAttempts: 1})
 	jobs := make(chan dto.QueueMessage, 2)
 
 	done := make(chan struct{})
 	go func() {
-		rawConsumer.Consumer(ctx, jobs)
+		rawConsumer.Start(ctx, jobs)
 		close(done)
 	}()
 
@@ -79,7 +79,7 @@ func TestRawEventConsumer_RetriesReceiveErrorWithBackoff(t *testing.T) {
 			{{ID: "message-1"}},
 		},
 	}
-	rawConsumer := NewRawEventsConsumer(consumer, retry.Policy{
+	rawConsumer := NewRawEventConsumer(consumer, retry.Policy{
 		InitialBackoff: 0,
 		MaxBackoff:     0,
 		MaxAttempts:    1,
@@ -88,7 +88,7 @@ func TestRawEventConsumer_RetriesReceiveErrorWithBackoff(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		rawConsumer.Consumer(ctx, jobs)
+		rawConsumer.Start(ctx, jobs)
 		close(done)
 	}()
 

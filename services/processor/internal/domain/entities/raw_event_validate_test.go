@@ -5,9 +5,11 @@ import (
 	"time"
 )
 
+const validUUIDV4 = "2f4db003-dbc5-4b1b-bf7b-1f847b69ce1f"
+
 func mockRawEvent() RawEvent {
 	return RawEvent{
-		EventID:     "123e4567-e89b-12d3-a456-426614174000",
+		EventID:     validUUIDV4,
 		DeveloperID: "dev123",
 		MetricType:  "commits",
 		Value:       5,
@@ -23,11 +25,7 @@ func TestRawEvent_Validate(t *testing.T) {
 		event   RawEvent
 		wantErr bool
 	}{
-		{
-			name:    "valid event",
-			event:   mockRawEvent(),
-			wantErr: false,
-		},
+		{name: "valid event", event: mockRawEvent()},
 		{
 			name: "missing event_id",
 			event: RawEvent{
@@ -51,9 +49,20 @@ func TestRawEvent_Validate(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "missing developer_id",
+			name: "uuid v1 is rejected",
 			event: RawEvent{
 				EventID:     "123e4567-e89b-12d3-a456-426614174000",
+				DeveloperID: "dev123",
+				MetricType:  "commits",
+				Value:       5,
+				Timestamp:   "2024-01-01T12:00:00Z",
+			},
+			wantErr: true,
+		},
+		{
+			name: "missing developer_id",
+			event: RawEvent{
+				EventID:     validUUIDV4,
 				DeveloperID: "",
 				MetricType:  "commits",
 				Value:       5,
@@ -64,7 +73,7 @@ func TestRawEvent_Validate(t *testing.T) {
 		{
 			name: "blank developer_id",
 			event: RawEvent{
-				EventID:     "123e4567-e89b-12d3-a456-426614174000",
+				EventID:     validUUIDV4,
 				DeveloperID: "   ",
 				MetricType:  "commits",
 				Value:       5,
@@ -75,7 +84,7 @@ func TestRawEvent_Validate(t *testing.T) {
 		{
 			name: "invalid metric_type",
 			event: RawEvent{
-				EventID:     "123e4567-e89b-12d3-a456-426614174000",
+				EventID:     validUUIDV4,
 				DeveloperID: "dev123",
 				MetricType:  "invalid_metric",
 				Value:       5,
@@ -86,7 +95,7 @@ func TestRawEvent_Validate(t *testing.T) {
 		{
 			name: "negative value",
 			event: RawEvent{
-				EventID:     "123e4567-e89b-12d3-a456-426614174000",
+				EventID:     validUUIDV4,
 				DeveloperID: "dev123",
 				MetricType:  "commits",
 				Value:       -1,
@@ -97,18 +106,17 @@ func TestRawEvent_Validate(t *testing.T) {
 		{
 			name: "review_time_minutes at max",
 			event: RawEvent{
-				EventID:     "123e4567-e89b-12d3-a456-426614174000",
+				EventID:     validUUIDV4,
 				DeveloperID: "dev123",
 				MetricType:  "review_time_minutes",
 				Value:       1440,
 				Timestamp:   "2024-01-01T12:00:00Z",
 			},
-			wantErr: false,
 		},
 		{
 			name: "review_time_minutes exceeding max",
 			event: RawEvent{
-				EventID:     "123e4567-e89b-12d3-a456-426614174000",
+				EventID:     validUUIDV4,
 				DeveloperID: "dev123",
 				MetricType:  "review_time_minutes",
 				Value:       1500,
@@ -119,7 +127,7 @@ func TestRawEvent_Validate(t *testing.T) {
 		{
 			name: "missing timestamp",
 			event: RawEvent{
-				EventID:     "123e4567-e89b-12d3-a456-426614174000",
+				EventID:     validUUIDV4,
 				DeveloperID: "dev123",
 				MetricType:  "commits",
 				Value:       5,
@@ -127,9 +135,10 @@ func TestRawEvent_Validate(t *testing.T) {
 			},
 			wantErr: true,
 		},
-		{name: "invalid timestamp format",
+		{
+			name: "invalid timestamp format",
 			event: RawEvent{
-				EventID:     "123e4567-e89b-12d3-a456-426614174000",
+				EventID:     validUUIDV4,
 				DeveloperID: "dev123",
 				MetricType:  "commits",
 				Value:       5,
@@ -140,7 +149,7 @@ func TestRawEvent_Validate(t *testing.T) {
 		{
 			name: "future timestamp",
 			event: RawEvent{
-				EventID:     "123e4567-e89b-12d3-a456-426614174000",
+				EventID:     validUUIDV4,
 				DeveloperID: "dev123",
 				MetricType:  "commits",
 				Value:       5,
